@@ -1,0 +1,5 @@
+{
+  "name": "Liquor Store Locator",
+  "description": "Inventory and rack location management for liquor stores with CSV sync.",
+  "requestFramePermissions": ["camera", "clipboard-read", "clipboard-write"]
+}
