@@ -177,7 +177,11 @@ async function startServer() {
 
       proxyReq.on('error', (err) => {
         console.error('Image proxy error:', err.message);
-        res.status(500).send('Proxy error');
+        if (!res.headersSent) {
+          res.status(500).send('Proxy error');
+        } else {
+          res.end(); // close the stream if headers were already sent
+        }
       });
     } catch (e) {
       res.status(400).send('Invalid URL');
