@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, AlertTriangle, CheckCircle, Trash2 } from 'lucide-react';
+import Barcode from 'react-barcode';
 import { Verification } from '../types';
 
 export function VerificationReports() {
   const [verifications, setVerifications] = useState<Verification[]>([]);
+  const [filter, setFilter] = useState<'all' | 'matched' | 'mismatched'>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -71,17 +73,26 @@ export function VerificationReports() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-stone-200">
+        <div 
+          onClick={() => setFilter('all')}
+          className={`cursor-pointer bg-white p-6 rounded-2xl shadow-sm border transition-all ${filter === 'all' ? 'border-stone-800 ring-2 ring-stone-800 ring-offset-2' : 'border-stone-200 hover:border-stone-300'}`}
+        >
           <div className="text-stone-500 text-sm font-medium uppercase tracking-wider mb-2">Total Verified</div>
           <div className="text-4xl font-bold text-stone-800">{verifications.length}</div>
         </div>
-        <div className="bg-emerald-50 p-6 rounded-2xl shadow-sm border border-emerald-100">
+        <div 
+          onClick={() => setFilter('matched')}
+          className={`cursor-pointer bg-emerald-50 p-6 rounded-2xl shadow-sm border transition-all ${filter === 'matched' ? 'border-emerald-500 ring-2 ring-emerald-500 ring-offset-2' : 'border-emerald-100 hover:border-emerald-200'}`}
+        >
           <div className="text-emerald-600 text-sm font-medium uppercase tracking-wider mb-2 flex items-center gap-2">
             <CheckCircle className="w-4 h-4" /> Matched
           </div>
           <div className="text-4xl font-bold text-emerald-700">{matches.length}</div>
         </div>
-        <div className="bg-red-50 p-6 rounded-2xl shadow-sm border border-red-100">
+        <div 
+          onClick={() => setFilter('mismatched')}
+          className={`cursor-pointer bg-red-50 p-6 rounded-2xl shadow-sm border transition-all ${filter === 'mismatched' ? 'border-red-500 ring-2 ring-red-500 ring-offset-2' : 'border-red-100 hover:border-red-200'}`}
+        >
           <div className="text-red-600 text-sm font-medium uppercase tracking-wider mb-2 flex items-center gap-2">
             <AlertTriangle className="w-4 h-4" /> Mismatched
           </div>
@@ -89,61 +100,130 @@ export function VerificationReports() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
-        <div className="p-6 border-b border-stone-100 bg-stone-50 flex justify-between items-center">
-          <h3 className="text-lg font-bold text-stone-800 flex items-center gap-2">
-            <FileText className="w-5 h-5 text-stone-500" />
-            Discrepancies (Needs POS Update)
-          </h3>
+      {(filter === 'all' || filter === 'mismatched') && (
+        <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden mb-8">
+          <div className="p-6 border-b border-stone-100 bg-stone-50 flex justify-between items-center">
+            <h3 className="text-lg font-bold text-stone-800 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-red-500" />
+              Discrepancies (Mismatched Stock)
+            </h3>
+          </div>
+          
+          {mismatches.length === 0 ? (
+            <div className="p-12 text-center text-stone-500">
+              <CheckCircle className="w-12 h-12 mx-auto mb-4 text-emerald-400" />
+              <p className="text-lg font-medium">No discrepancies found!</p>
+              <p>All verified items match the system stock.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-stone-50 border-b border-stone-200">
+                    <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider">Date</th>
+                    <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider">Product</th>
+                    <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-center">Barcode / UPC</th>
+                    <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">System Stock</th>
+                    <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">Actual Stock</th>
+                    <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">Diff</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mismatches.map((v) => {
+                    const diff = v.actual_stock - v.system_stock;
+                    return (
+                      <tr key={v.id} className="border-b border-stone-100 hover:bg-stone-50 transition-colors">
+                        <td className="p-4 text-sm text-stone-500 whitespace-nowrap">
+                          {new Date(v.created_at).toLocaleString()}
+                        </td>
+                        <td className="p-4 font-medium text-stone-800">{v.name}</td>
+                        <td className="p-4 flex flex-col items-center justify-center">
+                          {v.mainupc ? (
+                            <div className="overflow-hidden mix-blend-multiply opacity-80 scale-90 origin-center">
+                              <Barcode value={v.mainupc} format="CODE128" width={1.5} height={30} fontSize={12} background="transparent" />
+                            </div>
+                          ) : (
+                            <span className="text-sm text-stone-400">No Barcode</span>
+                          )}
+                          <span className="text-xs text-stone-400 mt-1">{v.sku}</span>
+                        </td>
+                        <td className="p-4 text-right font-medium text-stone-600">{v.system_stock}</td>
+                        <td className="p-4 text-right font-bold text-red-600">{v.actual_stock}</td>
+                        <td className="p-4 text-right font-bold">
+                          <span className={`px-2 py-1 rounded-md text-xs ${diff > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                            {diff > 0 ? '+' : ''}{diff}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-        
-        {mismatches.length === 0 ? (
-          <div className="p-12 text-center text-stone-500">
-            <CheckCircle className="w-12 h-12 mx-auto mb-4 text-emerald-400" />
-            <p className="text-lg font-medium">No discrepancies found!</p>
-            <p>All verified items match the system stock.</p>
+      )}
+
+      {(filter === 'all' || filter === 'matched') && (
+        <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
+          <div className="p-6 border-b border-stone-100 bg-stone-50 flex justify-between items-center">
+            <h3 className="text-lg font-bold text-stone-800 flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-emerald-500" />
+              Verified (Matched Stock)
+            </h3>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-stone-50 border-b border-stone-200">
-                  <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider">Date</th>
-                  <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider">Product</th>
-                  <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider">UPC / SKU</th>
-                  <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">System Stock</th>
-                  <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">Actual Stock</th>
-                  <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">Diff</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mismatches.map((v) => {
-                  const diff = v.actual_stock - v.system_stock;
-                  return (
-                    <tr key={v.id} className="border-b border-stone-100 hover:bg-stone-50 transition-colors">
-                      <td className="p-4 text-sm text-stone-500 whitespace-nowrap">
-                        {new Date(v.created_at).toLocaleString()}
-                      </td>
-                      <td className="p-4 font-medium text-stone-800">{v.name}</td>
-                      <td className="p-4 text-sm font-mono text-stone-500">
-                        {v.mainupc || 'N/A'}<br/>
-                        <span className="text-xs text-stone-400">{v.sku}</span>
-                      </td>
-                      <td className="p-4 text-right font-medium text-stone-600">{v.system_stock}</td>
-                      <td className="p-4 text-right font-bold text-red-600">{v.actual_stock}</td>
-                      <td className="p-4 text-right font-bold">
-                        <span className={`px-2 py-1 rounded-md text-xs ${diff > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                          {diff > 0 ? '+' : ''}{diff}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+          
+          {matches.length === 0 ? (
+            <div className="p-12 text-center text-stone-500">
+              <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-stone-300" />
+              <p className="text-lg font-medium">No verified matches yet.</p>
+              <p>Scan items to see them listed here when their stock matches perfectly.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-stone-50 border-b border-stone-200">
+                    <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider">Date</th>
+                    <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider">Product</th>
+                    <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-center">Barcode / UPC</th>
+                    <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">System Stock</th>
+                    <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">Actual Stock</th>
+                    <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {matches.map((v) => {
+                    return (
+                      <tr key={v.id} className="border-b border-stone-100 hover:bg-stone-50 transition-colors">
+                        <td className="p-4 text-sm text-stone-500 whitespace-nowrap">
+                          {new Date(v.created_at).toLocaleString()}
+                        </td>
+                        <td className="p-4 font-medium text-stone-800">{v.name}</td>
+                        <td className="p-4 flex flex-col items-center justify-center">
+                          {v.mainupc ? (
+                            <div className="overflow-hidden mix-blend-multiply opacity-80 scale-90 origin-center">
+                              <Barcode value={v.mainupc} format="CODE128" width={1.5} height={30} fontSize={12} background="transparent" />
+                            </div>
+                          ) : (
+                            <span className="text-sm text-stone-400">No Barcode</span>
+                          )}
+                          <span className="text-xs text-stone-400 mt-1">{v.sku}</span>
+                        </td>
+                        <td className="p-4 text-right font-medium text-stone-600">{v.system_stock}</td>
+                        <td className="p-4 text-right font-bold text-emerald-600">{v.actual_stock}</td>
+                        <td className="p-4 text-right font-bold">
+                          <span className="px-2 py-1 rounded-md text-xs bg-emerald-100 text-emerald-700">Perfect</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
