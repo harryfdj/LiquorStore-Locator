@@ -11,6 +11,7 @@ export function useInventory(searchQuery: string) {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [fetchProgress, setFetchProgress] = useState({ current: 0, total: 0, found: 0 });
   const [uploadMessage, setUploadMessage] = useState<{type: 'success'|'error', text: string} | null>(null);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cancelFetchRef = useRef(false);
@@ -273,6 +274,6 @@ export function useInventory(searchQuery: string) {
     startEditing, cancelEditing, saveEdits,
     imageSelectorSku, setImageSelectorSku, imageCandidates, isLoadingCandidates,
     openImageSelector, selectImage,
-    visibleCount
+    visibleCount, showAdminPanel, setShowAdminPanel
   };
 }

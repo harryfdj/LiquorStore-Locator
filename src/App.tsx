@@ -26,9 +26,9 @@ export default function App() {
         selectedDept={inventory.selectedDept} setSelectedDept={inventory.setSelectedDept} departments={inventory.departments}
         isUploading={inventory.isUploading} isFetchingImages={inventory.isFetchingImages} isResetting={inventory.isResetting}
         setShowResetConfirm={inventory.setShowResetConfirm} fetchProgress={inventory.fetchProgress}
-        batchFetchImages={inventory.batchFetchImages} stopFetchImages={inventory.stopFetchImages}
+        batchFetchImages={inventory.batchFetchImages}        stopFetchImages={inventory.stopFetchImages}
         fileInputRef={inventory.fileInputRef} handleFileUpload={inventory.handleFileUpload as any}
-        setIsSidebarOpen={setIsSidebarOpen}
+        setIsSidebarOpen={setIsSidebarOpen} showAdminPanel={inventory.showAdminPanel} setShowAdminPanel={inventory.setShowAdminPanel}
       />
 
       <Sidebar
