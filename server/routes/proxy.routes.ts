@@ -21,6 +21,7 @@ router.get('/', (req, res) => {
           'Referer': parsedUrl.origin,
           'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
         },
+        rejectUnauthorized: false
       },
       (imgRes) => {
         // Follow redirects
