@@ -7,6 +7,10 @@ import { VerificationReports } from './components/VerificationReports';
 import { CameraScanner } from './components/CameraScanner';
 
 export default function App() {
+  // Route external image URLs through our server proxy to avoid CORS/hotlink blocks
+  const proxyUrl = (url: string) =>
+    url ? `/api/image-proxy?url=${encodeURIComponent(url)}` : '';
+
   const [activeTab, setActiveTab] = useState<'inventory' | 'verify' | 'reports'>('inventory');
   const [products, setProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -18,9 +22,10 @@ export default function App() {
   const [isResetting, setIsResetting] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [fetchProgress, setFetchProgress] = useState({ current: 0, total: 0 });
+  const [fetchProgress, setFetchProgress] = useState({ current: 0, total: 0, found: 0 });
   const [uploadMessage, setUploadMessage] = useState<{type: 'success'|'error', text: string} | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cancelFetchRef = useRef(false); // set to true to stop mid-batch
 
   // Image Selector State
   const [imageSelectorSku, setImageSelectorSku] = useState<string | null>(null);
@@ -125,49 +130,83 @@ export default function App() {
     }
   };
 
+  const BATCH_SIZE = 30;
+
+  const stopFetchImages = () => {
+    cancelFetchRef.current = true;
+  };
+
   const batchFetchImages = async () => {
+    // Only process products that don't already have an image (enables resume after stop)
     const productsWithoutImages = products.filter(p => !p.image_url);
     if (productsWithoutImages.length === 0) {
       setUploadMessage({ type: 'success', text: 'All products already have images!' });
       return;
     }
 
-    // Process in batches of 5 to avoid overwhelming the server
-    const BATCH_SIZE = 5;
+    cancelFetchRef.current = false;
     setIsFetchingImages(true);
-    setFetchProgress({ current: 0, total: productsWithoutImages.length });
+    setFetchProgress({ current: 0, total: productsWithoutImages.length, found: 0 });
     setUploadMessage(null);
 
     let successCount = 0;
+    let processedCount = 0;
 
     for (let i = 0; i < productsWithoutImages.length; i += BATCH_SIZE) {
+      // Check if user requested a stop before each batch
+      if (cancelFetchRef.current) break;
+
       const batch = productsWithoutImages.slice(i, i + BATCH_SIZE);
-      
-      const promises = batch.map(async (product) => {
-        try {
+
+      // Fire all 30 in parallel; wait for every one to finish before next batch
+      const results = await Promise.allSettled(
+        batch.map(async (product) => {
           const res = await fetch(`/api/products/${product.sku}/fetch-image`, { method: 'POST' });
           if (res.ok) {
             const data = await res.json();
-            // Update local state immediately for this product
-            setProducts(prev => prev.map(p => p.sku === product.sku ? { ...p, image_url: data.image_url } : p));
-            successCount++;
+            if (data.image_url) {
+              setProducts(prev => prev.map(p =>
+                p.sku === product.sku ? { ...p, image_url: data.image_url } : p
+              ));
+              return true; // found
+            }
           }
-        } catch (err) {
-          console.error(`Failed to fetch image for ${product.sku}`, err);
-        }
+          return false; // not found
+        })
+      );
+
+      const batchFound = results.filter(r => r.status === 'fulfilled' && r.value === true).length;
+      successCount += batchFound;
+      processedCount += batch.length;
+
+      setFetchProgress({
+        current: processedCount,
+        total: productsWithoutImages.length,
+        found: successCount,
       });
 
-      await Promise.all(promises);
-      setFetchProgress(prev => ({ ...prev, current: Math.min(i + BATCH_SIZE, productsWithoutImages.length) }));
-      
-      // Small delay between batches
-      if (i + BATCH_SIZE < productsWithoutImages.length) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+      // Small pause between batches to avoid hammering Google
+      if (!cancelFetchRef.current && i + BATCH_SIZE < productsWithoutImages.length) {
+        await new Promise(resolve => setTimeout(resolve, 800));
       }
     }
 
+    const stopped = cancelFetchRef.current;
+    cancelFetchRef.current = false;
     setIsFetchingImages(false);
-    setUploadMessage({ type: 'success', text: `Successfully fetched images for ${successCount} products.` });
+
+    if (stopped) {
+      const remaining = productsWithoutImages.length - processedCount;
+      setUploadMessage({
+        type: 'success',
+        text: `Stopped after ${processedCount} products — found ${successCount} images. ${remaining} remaining (click Auto-Fetch to continue).`,
+      });
+    } else {
+      setUploadMessage({
+        type: 'success',
+        text: `Done! Found images for ${successCount} out of ${productsWithoutImages.length} products.`,
+      });
+    }
   };
 
   const startEditing = (product: Product) => {
@@ -322,17 +361,31 @@ export default function App() {
                   </button>
                 </div>
 
-                <div>
-                  <button
-                    onClick={batchFetchImages}
-                    disabled={isFetchingImages || isUploading || isResetting}
-                    className="flex items-center gap-2 bg-stone-700 hover:bg-stone-600 text-white px-4 py-2 rounded-xl font-medium transition-colors disabled:opacity-50"
-                  >
-                    <ImageIcon className="w-5 h-5" />
-                    <span className="hidden sm:inline">
-                      {isFetchingImages ? `Fetching (${fetchProgress.current}/${fetchProgress.total})...` : 'Auto-Fetch Images'}
-                    </span>
-                  </button>
+                <div className="flex items-center gap-2">
+                  {isFetchingImages ? (
+                    <>
+                      <button
+                        onClick={stopFetchImages}
+                        className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl font-medium transition-colors"
+                      >
+                        <X className="w-5 h-5" />
+                        <span className="hidden sm:inline">Stop</span>
+                      </button>
+                      <div className="hidden sm:flex flex-col text-xs text-emerald-100 leading-tight">
+                        <span>Batch {Math.ceil(fetchProgress.current / BATCH_SIZE)}/{Math.ceil(fetchProgress.total / BATCH_SIZE)}</span>
+                        <span>{fetchProgress.current}/{fetchProgress.total} · {fetchProgress.found} found</span>
+                      </div>
+                    </>
+                  ) : (
+                    <button
+                      onClick={batchFetchImages}
+                      disabled={isUploading || isResetting}
+                      className="flex items-center gap-2 bg-stone-700 hover:bg-stone-600 text-white px-4 py-2 rounded-xl font-medium transition-colors disabled:opacity-50"
+                    >
+                      <ImageIcon className="w-5 h-5" />
+                      <span className="hidden sm:inline">Auto-Fetch Images</span>
+                    </button>
+                  )}
                 </div>
 
                 <div>
@@ -459,14 +512,29 @@ export default function App() {
                 <span>{isUploading ? 'Syncing...' : 'Sync CSV'}</span>
               </button>
 
-              <button
-                onClick={() => { batchFetchImages(); setIsSidebarOpen(false); }}
-                disabled={isFetchingImages || isUploading || isResetting}
-                className="flex items-center gap-3 bg-stone-700 hover:bg-stone-600 text-white px-4 py-3 rounded-xl font-medium transition-colors disabled:opacity-50 w-full"
-              >
-                <ImageIcon className="w-5 h-5" />
-                <span>{isFetchingImages ? `Fetching (${fetchProgress.current}/${fetchProgress.total})...` : 'Auto-Fetch Images'}</span>
-              </button>
+              {isFetchingImages ? (
+                <>
+                  <button
+                    onClick={stopFetchImages}
+                    className="flex items-center gap-3 bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-xl font-medium transition-colors w-full"
+                  >
+                    <X className="w-5 h-5" />
+                    <span>Stop Fetching</span>
+                  </button>
+                  <div className="text-xs text-emerald-300 px-1">
+                    {fetchProgress.current}/{fetchProgress.total} processed · {fetchProgress.found} found
+                  </div>
+                </>
+              ) : (
+                <button
+                  onClick={() => { batchFetchImages(); setIsSidebarOpen(false); }}
+                  disabled={isUploading || isResetting}
+                  className="flex items-center gap-3 bg-stone-700 hover:bg-stone-600 text-white px-4 py-3 rounded-xl font-medium transition-colors disabled:opacity-50 w-full"
+                >
+                  <ImageIcon className="w-5 h-5" />
+                  <span>Auto-Fetch Images</span>
+                </button>
+              )}
 
               <button
                 onClick={() => { setShowResetConfirm(true); setIsSidebarOpen(false); }}
@@ -558,10 +626,9 @@ export default function App() {
                       onClick={() => selectImage(imageSelectorSku, url)}
                     >
                       <img 
-                        src={url} 
+                        src={proxyUrl(url)} 
                         alt="Candidate" 
-                        className="w-full h-auto object-contain" 
-                        referrerPolicy="no-referrer"
+                        className="w-full h-auto object-contain"
                         onError={(e) => {
                           (e.target as HTMLImageElement).parentElement!.style.display = 'none';
                         }}
@@ -628,7 +695,7 @@ export default function App() {
               {/* Product Image Area */}
               <div className="h-48 bg-stone-100 relative border-b border-stone-200 flex items-center justify-center overflow-hidden">
                 {product.image_url ? (
-                  <img src={product.image_url} alt={product.name} className="w-full h-full object-contain p-4" referrerPolicy="no-referrer" />
+                  <img src={proxyUrl(product.image_url)} alt={product.name} className="w-full h-full object-contain p-4" />
                 ) : (
                   <div className="text-stone-400 flex flex-col items-center">
                     <ImageIcon className="w-12 h-12 mb-2 opacity-50" />
