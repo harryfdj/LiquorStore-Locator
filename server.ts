@@ -169,7 +169,22 @@ db.exec(`
     status TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS weekly_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    total_scanned INTEGER,
+    total_matched INTEGER,
+    total_mismatched INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `);
+
+// Add report_id to stock_verifications
+try {
+  db.exec(`ALTER TABLE stock_verifications ADD COLUMN report_id INTEGER DEFAULT NULL`);
+} catch (e) {
+  // Column already exists, ignore
+}
 
 // Add category column if it doesn't exist (for existing DBs)
 try {
@@ -280,10 +295,10 @@ async function startServer() {
     }
   });
 
-  // Get all stock verifications
+  // Get all stock verifications (active/unreported only)
   app.get('/api/verifications', (req, res) => {
     try {
-      const verifications = db.prepare('SELECT * FROM stock_verifications ORDER BY created_at DESC').all();
+      const verifications = db.prepare('SELECT * FROM stock_verifications WHERE report_id IS NULL ORDER BY created_at DESC').all();
       res.json(verifications);
     } catch (error) {
       console.error('Error fetching verifications:', error);
@@ -291,14 +306,72 @@ async function startServer() {
     }
   });
 
-  // Clear all stock verifications
+  // Clear all stock verifications (active ones)
   app.delete('/api/verifications', (req, res) => {
     try {
-      db.exec('DELETE FROM stock_verifications');
+      db.exec('DELETE FROM stock_verifications WHERE report_id IS NULL');
       res.json({ success: true, message: 'Verifications cleared' });
     } catch (error) {
       console.error('Error clearing verifications:', error);
       res.status(500).json({ error: 'Failed to clear verifications' });
+    }
+  });
+
+  // Finalize Weekly Report
+  app.post('/api/reports/finalize', (req, res) => {
+    try {
+      // 1. Get current stats
+      const stats = db.prepare(`
+        SELECT 
+          COUNT(*) as total_scanned,
+          SUM(CASE WHEN status = 'matched' THEN 1 ELSE 0 END) as total_matched,
+          SUM(CASE WHEN status = 'mismatched' THEN 1 ELSE 0 END) as total_mismatched
+        FROM stock_verifications
+        WHERE report_id IS NULL
+      `).get() as any;
+
+      if (stats.total_scanned === 0) {
+        return res.status(400).json({ error: 'No verifications to finalize' });
+      }
+
+      // 2. Insert into weekly_reports
+      const stmt = db.prepare(`
+        INSERT INTO weekly_reports (total_scanned, total_matched, total_mismatched)
+        VALUES (?, ?, ?)
+      `);
+      const result = stmt.run(stats.total_scanned, stats.total_matched || 0, stats.total_mismatched || 0);
+      const newReportId = result.lastInsertRowid;
+
+      // 3. Link verifications to the new report instead of deleting them
+      const updateStmt = db.prepare(`UPDATE stock_verifications SET report_id = ? WHERE report_id IS NULL`);
+      updateStmt.run(newReportId);
+
+      res.json({ success: true, message: 'Weekly report finalized', report_id: newReportId });
+    } catch (error) {
+      console.error('Error finalizing report:', error);
+      res.status(500).json({ error: 'Failed to finalize report' });
+    }
+  });
+
+  // Get Historical Weekly Reports
+  app.get('/api/reports', (req, res) => {
+    try {
+      const reports = db.prepare('SELECT * FROM weekly_reports ORDER BY created_at DESC').all();
+      res.json(reports);
+    } catch (error) {
+      console.error('Error fetching reports:', error);
+      res.status(500).json({ error: 'Failed to fetch reports' });
+    }
+  });
+
+  // Get specific items for a historical report
+  app.get('/api/reports/:id/items', (req, res) => {
+    try {
+      const items = db.prepare('SELECT * FROM stock_verifications WHERE report_id = ? ORDER BY created_at DESC').all(req.params.id);
+      res.json(items);
+    } catch (error) {
+      console.error('Error fetching report items:', error);
+      res.status(500).json({ error: 'Failed to fetch report items' });
     }
   });
 

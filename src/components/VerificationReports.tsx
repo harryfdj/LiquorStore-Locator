@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, AlertTriangle, CheckCircle, Trash2 } from 'lucide-react';
+import { FileText, AlertTriangle, CheckCircle, Trash2, Archive, CalendarDays, BarChart2, ChevronDown, ChevronUp } from 'lucide-react';
 import Barcode from 'react-barcode';
-import { Verification } from '../types';
+import { Verification, WeeklyReport } from '../types';
 
 export function VerificationReports() {
   const [verifications, setVerifications] = useState<Verification[]>([]);
+  const [pastReports, setPastReports] = useState<WeeklyReport[]>([]);
+  const [expandedReportId, setExpandedReportId] = useState<number | null>(null);
+  const [expandedItems, setExpandedItems] = useState<Verification[]>([]);
+  const [expandedLoading, setExpandedLoading] = useState(false);
   const [filter, setFilter] = useState<'all' | 'matched' | 'mismatched'>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -25,22 +29,62 @@ export function VerificationReports() {
     }
   };
 
-  useEffect(() => {
-    fetchVerifications();
-  }, []);
-
-  const handleClear = async () => {
-    if (!window.confirm('Are you sure you want to clear all verification history? This cannot be undone.')) return;
-    
+  const fetchPastReports = async () => {
     try {
-      const res = await fetch('/api/verifications', { method: 'DELETE' });
+      const res = await fetch('/api/reports');
       if (res.ok) {
-        setVerifications([]);
-      } else {
-        setError('Failed to clear verifications.');
+        const data = await res.json();
+        setPastReports(data);
       }
     } catch (err) {
-      setError('Failed to clear verifications.');
+      console.error('Failed to fetch past reports', err);
+    }
+  };
+
+  const handleExpandReport = async (reportId: number) => {
+    if (expandedReportId === reportId) {
+      setExpandedReportId(null);
+      setExpandedItems([]);
+      return;
+    }
+    
+    setExpandedReportId(reportId);
+    setExpandedLoading(true);
+    try {
+      const res = await fetch(`/api/reports/${reportId}/items`);
+      if (res.ok) {
+        const items = await res.json();
+        setExpandedItems(items);
+      }
+    } catch (err) {
+      console.error('Failed to fetch report items', err);
+    } finally {
+      setExpandedLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchVerifications();
+    fetchPastReports();
+  }, []);
+
+  const handleFinalizeReport = async () => {
+    if (verifications.length === 0) {
+      alert("There are no items verified this week to report.");
+      return;
+    }
+    if (!window.confirm('Are you sure you want to finalize this week\'s report? This will save your current progress to the Past Reports and clear the list for next week. This action cannot be undone.')) return;
+    
+    try {
+      const res = await fetch('/api/reports/finalize', { method: 'POST' });
+      if (res.ok) {
+        setVerifications([]);
+        fetchPastReports(); // Refresh past reports
+      } else {
+        setError('Failed to finalize report.');
+      }
+    } catch (err) {
+      setError('Failed to finalize report.');
     }
   };
 
@@ -57,11 +101,12 @@ export function VerificationReports() {
           <p className="text-stone-500">Review your weekly stock verification results.</p>
         </div>
         <button 
-          onClick={handleClear}
-          className="flex items-center gap-2 bg-red-50 text-red-600 px-4 py-2 rounded-lg font-medium hover:bg-red-100 transition-colors border border-red-200"
+          onClick={handleFinalizeReport}
+          disabled={verifications.length === 0}
+          className="flex items-center gap-2 bg-stone-800 text-white px-5 py-2.5 rounded-xl font-medium hover:bg-stone-900 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Trash2 className="w-4 h-4" />
-          Clear History
+          <Archive className="w-4 h-4" />
+          Mark as Reported
         </button>
       </div>
 
@@ -134,7 +179,8 @@ export function VerificationReports() {
                     return (
                       <tr key={v.id} className="border-b border-stone-100 hover:bg-stone-50 transition-colors">
                         <td className="p-4 text-sm text-stone-500 whitespace-nowrap">
-                          {new Date(v.created_at).toLocaleString()}
+                          {new Date(v.created_at).toLocaleDateString()},<br/>
+                          <span className="text-xs text-stone-400 mt-1 block">{new Date(v.created_at).toLocaleTimeString()}</span>
                         </td>
                         <td className="p-4 font-medium text-stone-800">{v.name}</td>
                         <td className="p-4 flex flex-col items-center justify-center">
@@ -197,7 +243,8 @@ export function VerificationReports() {
                     return (
                       <tr key={v.id} className="border-b border-stone-100 hover:bg-stone-50 transition-colors">
                         <td className="p-4 text-sm text-stone-500 whitespace-nowrap">
-                          {new Date(v.created_at).toLocaleString()}
+                          {new Date(v.created_at).toLocaleDateString()},<br/>
+                          <span className="text-xs text-stone-400 mt-1 block">{new Date(v.created_at).toLocaleTimeString()}</span>
                         </td>
                         <td className="p-4 font-medium text-stone-800">{v.name}</td>
                         <td className="p-4 flex flex-col items-center justify-center">
@@ -224,6 +271,159 @@ export function VerificationReports() {
           )}
         </div>
       )}
+
+      {/* PASt WEEKLY REPORTS */}
+      <div className="mt-12 bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
+        <div className="p-6 border-b border-stone-100 bg-stone-50 flex justify-between items-center">
+          <h3 className="text-lg font-bold text-stone-800 flex items-center gap-2">
+            <CalendarDays className="w-5 h-5 text-stone-500" />
+            Past Weekly Reports
+          </h3>
+        </div>
+
+        {pastReports.length === 0 ? (
+          <div className="p-12 text-center text-stone-500">
+            <BarChart2 className="w-12 h-12 mx-auto mb-4 text-stone-300" />
+            <p className="text-lg font-medium">No past reports yet.</p>
+            <p className="text-sm">When you click "Mark as Reported", your weekly totals will be archived here.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-stone-50 border-b border-stone-200">
+                  <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider">Report Date</th>
+                  <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">Total Scanned</th>
+                  <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">Matched</th>
+                  <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">Mismatched</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pastReports.map((report) => {
+                  const isExpanded = expandedReportId === report.id;
+                  return (
+                    <React.Fragment key={report.id}>
+                      <tr 
+                        onClick={() => handleExpandReport(report.id)} 
+                        className={`border-b border-stone-100 hover:bg-stone-50 transition-colors cursor-pointer ${isExpanded ? 'bg-stone-50' : ''}`}
+                      >
+                        <td className="p-4 font-medium text-stone-800 flex items-center gap-3">
+                          {isExpanded ? <ChevronUp className="w-4 h-4 text-stone-400" /> : <ChevronDown className="w-4 h-4 text-stone-400" />}
+                          <div>
+                            {new Date(report.created_at).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                            <span className="block text-xs font-normal text-stone-500 mt-1">{new Date(report.created_at).toLocaleTimeString()}</span>
+                          </div>
+                        </td>
+                        <td className="p-4 text-right font-bold text-stone-700">{report.total_scanned} Items</td>
+                        <td className="p-4 text-right font-bold text-emerald-600">
+                          {report.total_matched} 
+                          <span className="text-xs font-normal text-emerald-600/70 block">{report.total_scanned > 0 ? Math.round((report.total_matched/report.total_scanned)*100) : 0}% accuracy</span>
+                        </td>
+                        <td className="p-4 text-right font-bold text-red-600">
+                          {report.total_mismatched}
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr>
+                          <td colSpan={4} className="bg-stone-50 p-0 border-b border-stone-200">
+                            <div className="p-6 border-t border-stone-200 shadow-inner">
+                              <h4 className="font-bold text-stone-800 mb-4">Report Details</h4>
+                              {expandedLoading ? (
+                                <div className="text-sm text-stone-500 py-4">Loading items...</div>
+                              ) : expandedItems.length === 0 ? (
+                                <div className="text-sm text-stone-500 py-4">No items recorded.</div>
+                              ) : (
+                                <div className="flex flex-col gap-6">
+                                  {/* Mismatched Items Table */}
+                                  {expandedItems.filter(i => i.status === 'mismatched').length > 0 && (
+                                    <div className="bg-white border border-stone-200 rounded-lg overflow-hidden">
+                                      <div className="bg-red-50 border-b border-red-100 p-3 px-4 font-semibold text-red-700 text-sm flex items-center gap-2">
+                                        <AlertTriangle className="w-4 h-4" /> Mismatched Items
+                                      </div>
+                                      <table className="w-full text-left text-sm">
+                                        <thead className="bg-stone-50 text-xs uppercase text-stone-500 font-medium">
+                                          <tr>
+                                            <th className="px-4 py-3">Product</th>
+                                            <th className="px-4 py-3 text-center">Barcode / UPC</th>
+                                            <th className="px-4 py-3 text-right">System</th>
+                                            <th className="px-4 py-3 text-right">Actual</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-stone-100">
+                                          {expandedItems.filter(i => i.status === 'mismatched').map(item => (
+                                            <tr key={item.id} className="hover:bg-stone-50">
+                                              <td className="px-4 py-3 font-medium text-stone-800">{item.name}</td>
+                                              <td className="px-4 py-3 flex flex-col items-center justify-center">
+                                                {item.mainupc ? (
+                                                  <div className="overflow-hidden mix-blend-multiply opacity-80 scale-75 origin-center -my-2">
+                                                    <Barcode value={item.mainupc} format="CODE128" width={1.5} height={30} fontSize={12} background="transparent" />
+                                                  </div>
+                                                ) : (
+                                                  <span className="text-sm text-stone-400">No Barcode</span>
+                                                )}
+                                                <span className="text-xs text-stone-400 mt-1">{item.sku}</span>
+                                              </td>
+                                              <td className="px-4 py-3 text-right text-stone-600">{item.system_stock}</td>
+                                              <td className="px-4 py-3 text-right font-bold text-red-600">{item.actual_stock}</td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  )}
+
+                                  {/* Matched Items Table */}
+                                  {expandedItems.filter(i => i.status === 'matched').length > 0 && (
+                                    <div className="bg-white border border-stone-200 rounded-lg overflow-hidden">
+                                      <div className="bg-emerald-50 border-b border-emerald-100 p-3 px-4 font-semibold text-emerald-700 text-sm flex items-center gap-2">
+                                        <CheckCircle className="w-4 h-4" /> Matched Items
+                                      </div>
+                                      <table className="w-full text-left text-sm">
+                                        <thead className="bg-stone-50 text-xs uppercase text-stone-500 font-medium">
+                                          <tr>
+                                            <th className="px-4 py-3">Product</th>
+                                            <th className="px-4 py-3 text-center">Barcode / UPC</th>
+                                            <th className="px-4 py-3 text-right">System</th>
+                                            <th className="px-4 py-3 text-right">Actual</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-stone-100">
+                                          {expandedItems.filter(i => i.status === 'matched').map(item => (
+                                            <tr key={item.id} className="hover:bg-stone-50">
+                                              <td className="px-4 py-3 font-medium text-stone-800">{item.name}</td>
+                                              <td className="px-4 py-3 flex flex-col items-center justify-center">
+                                                {item.mainupc ? (
+                                                  <div className="overflow-hidden mix-blend-multiply opacity-80 scale-75 origin-center -my-2">
+                                                    <Barcode value={item.mainupc} format="CODE128" width={1.5} height={30} fontSize={12} background="transparent" />
+                                                  </div>
+                                                ) : (
+                                                  <span className="text-sm text-stone-400">No Barcode</span>
+                                                )}
+                                                <span className="text-xs text-stone-400 mt-1">{item.sku}</span>
+                                              </td>
+                                              <td className="px-4 py-3 text-right text-stone-600">{item.system_stock}</td>
+                                              <td className="px-4 py-3 text-right font-bold text-emerald-600">{item.actual_stock}</td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }

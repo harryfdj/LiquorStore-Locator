@@ -22,3 +22,11 @@ export interface Verification {
   status: 'matched' | 'mismatched';
   created_at: string;
 }
+
+export interface WeeklyReport {
+  id: number;
+  total_scanned: number;
+  total_matched: number;
+  total_mismatched: number;
+  created_at: string;
+}
