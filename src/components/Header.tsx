@@ -107,6 +107,17 @@ export const Header: React.FC<HeaderProps> = ({
               </select>
               {/* Admin Panel Toggle */}
               <div className="relative">
+                <input
+                  type="file"
+                  accept=".csv"
+                  className="hidden"
+                  ref={fileInputRef}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleFileUpload(file as any);
+                  }}
+                />
+                
                 <button
                   onClick={() => setShowAdminPanel(!showAdminPanel)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors border ${showAdminPanel ? 'bg-emerald-700 text-white border-emerald-600' : 'bg-emerald-800/50 text-emerald-100 hover:bg-emerald-700/50 border-emerald-700'}`}
