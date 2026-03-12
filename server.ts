@@ -84,6 +84,64 @@ const scoreImageMatch = (productName: string, result: { title: string; domain: s
   return score;
 };
 
+// Download an external image and save it locally
+const downloadImage = (url: string, sku: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    try {
+      const parsedUrl = new URL(url);
+      const transport = parsedUrl.protocol === 'https:' ? https : http;
+      
+      const extMatch = url.match(/\.(jpg|jpeg|png|webp|gif|avif)(?:\?|$)/i);
+      const ext = extMatch ? extMatch[1].toLowerCase() : 'jpg';
+      const filename = `${sku.replace(/[^a-z0-9]/gi, '_')}.${ext}`;
+      
+      const imagesDir = path.join(process.cwd(), 'public', 'product-images');
+      if (!fs.existsSync(imagesDir)) {
+        fs.mkdirSync(imagesDir, { recursive: true });
+      }
+      
+      const filepath = path.join(imagesDir, filename);
+      const fileStream = fs.createWriteStream(filepath);
+      
+      const req = transport.get(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Referer': parsedUrl.origin,
+        }
+      }, (res) => {
+        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          fileStream.close();
+          fs.unlinkSync(filepath);
+          if (res.headers.location.startsWith('http')) {
+            return downloadImage(res.headers.location, sku).then(resolve).catch(reject);
+          }
+          return reject(new Error('Invalid redirect'));
+        }
+        
+        if (res.statusCode !== 200) {
+          fileStream.close();
+          if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
+          return reject(new Error(`Status: ${res.statusCode}`));
+        }
+        
+        res.pipe(fileStream);
+        fileStream.on('finish', () => {
+          fileStream.close();
+          resolve(`/product-images/${filename}`);
+        });
+      });
+      
+      req.on('error', (err) => {
+        fileStream.close();
+        if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
+        reject(err);
+      });
+    } catch(err) {
+      reject(err);
+    }
+  });
+};
+
 // Initialize SQLite Database
 const db = new Database('inventory.db');
 
@@ -275,11 +333,22 @@ async function startServer() {
   });
 
   // Update a product's location or image
-  app.put('/api/products/:sku', (req, res) => {
+  app.put('/api/products/:sku', async (req, res) => {
     const { sku } = req.params;
-    const { location, image_url } = req.body;
+    const { location } = req.body;
+    let { image_url } = req.body;
 
     try {
+      // If a new external URL is provided, explicitly download it to local storage
+      if (image_url && image_url.startsWith('http')) {
+        try {
+          image_url = await downloadImage(image_url, sku);
+        } catch (downloadErr: any) {
+          console.error(`Failed to download manually selected image for ${sku}:`, downloadErr.message);
+          // if it fails to download, we can still fall back to just storing the external URL
+        }
+      }
+
       const stmt = db.prepare(`
         UPDATE products 
         SET location = COALESCE(?, location), 
@@ -287,7 +356,7 @@ async function startServer() {
         WHERE sku = ?
       `);
       stmt.run(location, image_url, sku);
-      res.json({ success: true });
+      res.json({ success: true, image_url });
     } catch (error) {
       console.error('Error updating product:', error);
       res.status(500).json({ error: 'Failed to update product' });
@@ -346,9 +415,17 @@ async function startServer() {
       }
 
       if (bestImage) {
+        let finalImageUrl = bestImage;
+        try {
+          // Attempt to download and save it to our own server
+          finalImageUrl = await downloadImage(bestImage, sku);
+        } catch (downloadErr: any) {
+          console.error(`Failed to download image for ${sku}, falling back to external URL.`, downloadErr.message);
+        }
+
         const stmt = db.prepare('UPDATE products SET image_url = ? WHERE sku = ?');
-        stmt.run(bestImage, sku);
-        return res.json({ success: true, image_url: bestImage });
+        stmt.run(finalImageUrl, sku);
+        return res.json({ success: true, image_url: finalImageUrl });
       } else {
         // Return 200 so the frontend doesn't log a flood of errors;
         // the batch loop checks res.ok AND data.image_url

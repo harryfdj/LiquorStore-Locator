@@ -8,8 +8,11 @@ import { CameraScanner } from './components/CameraScanner';
 
 export default function App() {
   // Route external image URLs through our server proxy to avoid CORS/hotlink blocks
-  const proxyUrl = (url: string) =>
-    url ? `/api/image-proxy?url=${encodeURIComponent(url)}` : '';
+  const proxyUrl = (url: string) => {
+    if (!url) return '';
+    if (url.startsWith('/product-images/')) return url;
+    return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+  };
 
   const [activeTab, setActiveTab] = useState<'inventory' | 'verify' | 'reports'>('inventory');
   const [products, setProducts] = useState<Product[]>([]);

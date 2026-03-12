@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link href='https://fonts.googleapis.com/css?family=Open+Sans:400,300,600,700,800' rel='stylesheet' type='text/css'>
+<title>Account Suspended</title>
+	<style>
+		body {
+			margin: 0;
+			padding: 0;
+			background: black;
+		}
+		header,
+		footer {
+			width: 100%;
+			background: black;
+		}
+		a,
+		a:link,
+		a:visited {
+			color: #efdc02;
+		}
+		.container {
+		  position: relative;
+		  width: 100%;
+		  max-width: 1051px;
+		  margin: 0 auto;
+		  box-sizing: border-box;
+		}
+		.importantMessage {
+			color: #fff;
+			font-family: 'Open Sans', sans-serif;
+			font-weight: 600;
+			font-size: 18px;
+			padding: 8px 15px 12px 15px;
+		}
+		.importantMessage  span { 
+			color: #efdc02;
+			font-weight: 700;
+			font-size: 21px;
+		}
+		.sorryBG {
+			background: url('http://webtosta.com/suspended/images/SorryBg.jpg') repeat-x center top;
+			width: 100%;
+			min-height: 600px;
+		}
+		.text-center {
+			text-align: center;
+		}
+		.sorryImgJPG {
+			display: none;
+		}
+		@media (max-width: 1032px) { 
+			.sorryBG img  {
+				width: 100%;
+			}
+			.sorryImgJPG {
+				display: none;
+			}
+		}
+		@media (max-width: 776px) {
+			.sorryImgJPG {
+				display: inherit;
+			}
+			.sorryImgPNG {
+				display: none;
+			}
+		}
+		@media (max-width: 322px) { 
+			.sorryBG {
+				background: #fff;
+			}
+			.text-left {
+				text-align: left;
+			} 
+			.importantMessage {
+				padding: 15px 0; 
+			}
+			.sorryImgPNG {
+				display: none;
+			}
+		}
+	</style>
+</head>
+<body>
+
+<header>
+	<div class="container">
+		<div class="importantMessage">
+			<span>Important Notice!</span> There is something wrong with you hosting account!  Please call us immediately! <span>305.386.9003</span>
+		</div>
+	</div>
+</header>
+
+<div class="sorryBG">
+	<div class="container">
+		<div class="text-center">
+			<img src="http://webtosta.com/suspended/images/sorryImg.png" alt="" class="sorryImgPNG">
+			<img src="http://webtosta.com/suspended/images/sorryImg.jpg" alt="" class="sorryImgJPG">
+		</div>
+	</div>
+</div>
+
+<footer>
+	<div class="container">
+		<div class="importantMessage text-center text-left">
+			<span>Important Notice!</span> There is something wrong with you hosting account!  Please call us immediately! <span>305.386.9003</span>
+			<div class="text-center"><span>Please ask for your project manager!</span></div>
+		</div>
+	</div>
+</footer>
+
+</body>
+</html>
