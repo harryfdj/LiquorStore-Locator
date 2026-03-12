@@ -2,6 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import { parse } from 'csv-parse';
 import fs from 'fs';
+import path from 'path';
 import db from '../db';
 import { searchImages, scoreImageMatch, downloadImage } from '../services/scraper';
 
@@ -194,7 +195,14 @@ router.get('/:sku/image-candidates', async (req, res) => {
 router.delete('/', (req, res) => {
   try {
     db.exec('DELETE FROM products');
-    res.json({ success: true, message: 'Database cleared' });
+    
+    // Also delete all locally downloaded images
+    const imagesDir = path.join(process.cwd(), 'public', 'product-images');
+    if (fs.existsSync(imagesDir)) {
+      fs.rmSync(imagesDir, { recursive: true, force: true });
+    }
+    
+    res.json({ success: true, message: 'Database and images cleared' });
   } catch (error) {
     console.error('Error clearing database:', error);
     res.status(500).json({ error: 'Failed to clear database' });
