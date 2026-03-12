@@ -19,7 +19,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-stone-100 text-stone-900 font-sans">
-      <Header 
+      <Header
         activeTab={activeTab} setActiveTab={setActiveTab}
         searchQuery={searchQuery} setSearchQuery={setSearchQuery}
         isScanning={isScanning} setIsScanning={setIsScanning}
@@ -31,7 +31,7 @@ export default function App() {
         setIsSidebarOpen={setIsSidebarOpen}
       />
 
-      <Sidebar 
+      <Sidebar
         isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen}
         activeTab={activeTab} setActiveTab={setActiveTab}
         selectedDept={inventory.selectedDept} setSelectedDept={inventory.setSelectedDept} departments={inventory.departments}
@@ -45,10 +45,10 @@ export default function App() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === 'verify' && <StockVerify searchQuery={searchQuery} setSearchQuery={setSearchQuery} />}
         {activeTab === 'reports' && <VerificationReports />}
-        
+
         {activeTab === 'inventory' && (
           <>
-            <ImageSelectorModal 
+            <ImageSelectorModal
               imageSelectorSku={inventory.imageSelectorSku!}
               imageCandidates={inventory.imageCandidates}
               isLoadingCandidates={inventory.isLoadingCandidates}
@@ -57,7 +57,7 @@ export default function App() {
               selectImage={inventory.selectImage}
             />
 
-            <ResetConfirmModal 
+            <ResetConfirmModal
               showResetConfirm={inventory.showResetConfirm}
               setShowResetConfirm={inventory.setShowResetConfirm}
               handleResetDatabase={inventory.handleResetDatabase}
@@ -72,7 +72,7 @@ export default function App() {
               </div>
             )}
 
-            <InventoryTab 
+            <InventoryTab
               products={inventory.products}
               visibleCount={inventory.visibleCount}
               editingSku={inventory.editingSku}
