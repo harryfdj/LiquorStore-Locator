@@ -1,7 +1,8 @@
 import express from 'express';
-import db from '../db';
 
 const router = express.Router();
+import { requireAuth } from '../middlewares/auth';
+router.use(requireAuth);
 
 
 
@@ -9,7 +10,7 @@ const router = express.Router();
 router.post('/finalize', (req, res) => {
   try {
     // 1. Get current stats
-    const stats = db.prepare(`
+    const stats = req.db!.prepare(`
       SELECT 
         COUNT(*) as total_scanned,
         SUM(CASE WHEN status = 'matched' THEN 1 ELSE 0 END) as total_matched,
@@ -23,7 +24,7 @@ router.post('/finalize', (req, res) => {
     }
 
     // 2. Insert into weekly_reports
-    const stmt = db.prepare(`
+    const stmt = req.db!.prepare(`
       INSERT INTO weekly_reports (total_scanned, total_matched, total_mismatched)
       VALUES (?, ?, ?)
     `);
@@ -31,7 +32,7 @@ router.post('/finalize', (req, res) => {
     const newReportId = result.lastInsertRowid;
 
     // 3. Link verifications to the new report instead of deleting them
-    const updateStmt = db.prepare(`UPDATE stock_verifications SET report_id = ? WHERE report_id IS NULL`);
+    const updateStmt = req.db!.prepare(`UPDATE stock_verifications SET report_id = ? WHERE report_id IS NULL`);
     updateStmt.run(newReportId);
 
     res.json({ success: true, message: 'Weekly report finalized', report_id: newReportId });
@@ -44,7 +45,7 @@ router.post('/finalize', (req, res) => {
 // Get Historical Weekly Reports
 router.get('/', (req, res) => {
   try {
-    const reports = db.prepare('SELECT * FROM weekly_reports ORDER BY created_at DESC').all();
+    const reports = req.db!.prepare('SELECT * FROM weekly_reports ORDER BY created_at DESC').all();
     res.json(reports);
   } catch (error) {
     console.error('Error fetching reports:', error);
@@ -55,7 +56,7 @@ router.get('/', (req, res) => {
 // Get specific items for a historical report
 router.get('/:id/items', (req, res) => {
   try {
-    const items = db.prepare('SELECT * FROM stock_verifications WHERE report_id = ? ORDER BY created_at DESC').all(req.params.id);
+    const items = req.db!.prepare('SELECT * FROM stock_verifications WHERE report_id = ? ORDER BY created_at DESC').all(req.params.id);
     res.json(items);
   } catch (error) {
     console.error('Error fetching report items:', error);

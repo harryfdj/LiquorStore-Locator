@@ -5,14 +5,19 @@ import inventoryRoutes from './server/routes/inventory.routes';
 import reportsRoutes from './server/routes/reports.routes';
 import verificationsRoutes from './server/routes/verifications.routes';
 import proxyRoutes from './server/routes/proxy.routes';
+import authRoutes from './server/routes/auth.routes';
+import adminRoutes from './server/routes/admin.routes';
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  app.use(express.static('public'));
   app.use(express.json());
 
   // Mount API Routes
+  app.use('/api/auth', authRoutes);
+  app.use('/api/admin', adminRoutes);
   app.use('/api/image-proxy', proxyRoutes);
   app.use('/api/products', inventoryRoutes);
   app.use('/api/reports', reportsRoutes);

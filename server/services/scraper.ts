@@ -75,7 +75,7 @@ export const scoreImageMatch = (productName: string, result: { title: string; do
 };
 
 // Download an external image and save it locally
-export const downloadImage = (url: string, sku: string): Promise<string> => {
+export const downloadImage = (url: string, sku: string, storeId: number): Promise<string> => {
   return new Promise((resolve, reject) => {
     try {
       const parsedUrl = new URL(url);
@@ -85,7 +85,7 @@ export const downloadImage = (url: string, sku: string): Promise<string> => {
       const ext = extMatch ? extMatch[1].toLowerCase() : 'jpg';
       const filename = `${sku.replace(/[^a-z0-9]/gi, '_')}.${ext}`;
       
-      const imagesDir = path.join(process.cwd(), 'public', 'product-images');
+      const imagesDir = path.join(process.cwd(), 'public', `product-images-${storeId}`);
       if (!fs.existsSync(imagesDir)) {
         fs.mkdirSync(imagesDir, { recursive: true });
       }
@@ -104,7 +104,7 @@ export const downloadImage = (url: string, sku: string): Promise<string> => {
           fileStream.close();
           fs.unlinkSync(filepath);
           if (res.headers.location.startsWith('http')) {
-            return downloadImage(res.headers.location, sku).then(resolve).catch(reject);
+            return downloadImage(res.headers.location, sku, storeId).then(resolve).catch(reject);
           }
           return reject(new Error('Invalid redirect'));
         }
@@ -118,7 +118,7 @@ export const downloadImage = (url: string, sku: string): Promise<string> => {
         res.pipe(fileStream);
         fileStream.on('finish', () => {
           fileStream.close();
-          resolve(`/product-images/${filename}`);
+          resolve(`/product-images-${storeId}/${filename}`);
         });
       });
       

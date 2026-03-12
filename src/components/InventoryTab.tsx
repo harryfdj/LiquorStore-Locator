@@ -5,7 +5,7 @@ import { Product } from '../types';
 
 export const proxyUrl = (url: string) => {
   if (!url) return '';
-  if (url.startsWith('/product-images/')) return url;
+  if (url.match(/^\/product-images(?:-\d+)?\//)) return url;
   return `/api/image-proxy?url=${encodeURIComponent(url)}`;
 };
 

@@ -3,17 +3,18 @@ import multer from 'multer';
 import { parse } from 'csv-parse';
 import fs from 'fs';
 import path from 'path';
-import db from '../db';
 import { searchImages, scoreImageMatch, downloadImage } from '../services/scraper';
 
 const router = express.Router();
+import { requireAuth } from '../middlewares/auth';
+router.use(requireAuth);
 const upload = multer({ dest: 'uploads/' });
 
 // Get product by UPC or SKU for verification
 router.get('/upc/:upc', (req, res) => {
   try {
     const upc = req.params.upc;
-    const product = db.prepare('SELECT * FROM products WHERE mainupc = ? OR sku = ?').get(upc, upc);
+    const product = req.db!.prepare('SELECT * FROM products WHERE mainupc = ? OR sku = ?').get(upc, upc);
     if (product) {
       res.json(product);
     } else {
@@ -46,7 +47,7 @@ router.get('/', (req, res) => {
   query += ' ORDER BY name ASC';
 
   try {
-    const stmt = db.prepare(query);
+    const stmt = req.db!.prepare(query);
     const products = stmt.all(...params);
     res.json(products);
   } catch (error) {
@@ -64,13 +65,14 @@ router.put('/:sku', async (req, res) => {
   try {
     if (image_url && image_url.startsWith('http')) {
       try {
-        image_url = await downloadImage(image_url, sku);
+        const storeId = (req.user as any).storeId;
+        image_url = await downloadImage(image_url, sku, storeId);
       } catch (downloadErr: any) {
         console.error(`Failed to download manually selected image for ${sku}:`, downloadErr.message);
       }
     }
 
-    const stmt = db.prepare(`
+    const stmt = req.db!.prepare(`
       UPDATE products 
       SET location = COALESCE(?, location), 
           image_url = COALESCE(?, image_url)
@@ -88,7 +90,7 @@ router.put('/:sku', async (req, res) => {
 router.post('/:sku/fetch-image', async (req, res) => {
   const { sku } = req.params;
   try {
-    const product = db.prepare('SELECT name, size FROM products WHERE sku = ?').get(sku) as any;
+    const product = req.db!.prepare('SELECT name, size FROM products WHERE sku = ?').get(sku) as any;
     
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
@@ -133,12 +135,13 @@ router.post('/:sku/fetch-image', async (req, res) => {
     if (bestImage) {
       let finalImageUrl = bestImage;
       try {
-        finalImageUrl = await downloadImage(bestImage, sku);
+        const storeId = (req.user as any).storeId;
+        finalImageUrl = await downloadImage(bestImage, sku, storeId);
       } catch (downloadErr: any) {
         console.error(`Failed to download image for ${sku}, falling back to external URL.`, downloadErr.message);
       }
 
-      const stmt = db.prepare('UPDATE products SET image_url = ? WHERE sku = ?');
+      const stmt = req.db!.prepare('UPDATE products SET image_url = ? WHERE sku = ?');
       stmt.run(finalImageUrl, sku);
       return res.json({ success: true, image_url: finalImageUrl });
     } else {
@@ -154,7 +157,7 @@ router.post('/:sku/fetch-image', async (req, res) => {
 router.get('/:sku/image-candidates', async (req, res) => {
   const { sku } = req.params;
   try {
-    const stmt = db.prepare('SELECT name FROM products WHERE sku = ?');
+    const stmt = req.db!.prepare('SELECT name FROM products WHERE sku = ?');
     const product = stmt.get(sku) as any;
     
     if (!product) {
@@ -194,10 +197,11 @@ router.get('/:sku/image-candidates', async (req, res) => {
 // Clear all data (reset database)
 router.delete('/', (req, res) => {
   try {
-    db.exec('DELETE FROM products');
+    req.db!.exec('DELETE FROM products');
     
-    // Also delete all locally downloaded images
-    const imagesDir = path.join(process.cwd(), 'public', 'product-images');
+    // Also delete all locally downloaded images for this specific store
+    const storeId = (req.user as any).storeId;
+    const imagesDir = path.join(process.cwd(), 'public', `product-images-${storeId}`);
     if (fs.existsSync(imagesDir)) {
       fs.rmSync(imagesDir, { recursive: true, force: true });
     }
@@ -222,7 +226,7 @@ router.post('/upload', upload.single('file'), (req, res) => {
     .on('data', (data) => results.push(data))
     .on('end', () => {
       try {
-        const insertOrUpdate = db.prepare(`
+        const insertOrUpdate = req.db!.prepare(`
           INSERT INTO products (sku, name, size, pack, price, stock, location, image_url, category, mainupc, depname)
           VALUES (@sku, @name, @size, @pack, @price, @stock, COALESCE((SELECT location FROM products WHERE sku = @sku), ''), COALESCE((SELECT image_url FROM products WHERE sku = @sku), ''), @category, @mainupc, @depname)
           ON CONFLICT(sku) DO UPDATE SET
@@ -236,7 +240,7 @@ router.post('/upload', upload.single('file'), (req, res) => {
             depname = excluded.depname
         `);
 
-        const transaction = db.transaction((items) => {
+        const transaction = req.db!.transaction((items) => {
           for (const item of items) {
             const sku = item.sku || item.SKU;
             const name = item.description || item.ITEMNAME;
