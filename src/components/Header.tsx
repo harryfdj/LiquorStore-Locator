@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, Search, Upload, Menu, X, Trash2, Image as ImageIcon, ClipboardCheck, FileText } from 'lucide-react';
+import { Package, Search, Upload, Menu, X, Trash2, Image as ImageIcon, ClipboardCheck, FileText, Settings } from 'lucide-react';
 import { CameraScanner } from './CameraScanner';
 
 interface HeaderProps {
@@ -9,9 +9,6 @@ interface HeaderProps {
   setSearchQuery: (q: string) => void;
   isScanning: boolean;
   setIsScanning: (s: boolean) => void;
-  selectedDept: string;
-  setSelectedDept: (d: string) => void;
-  departments: string[];
   isUploading: boolean;
   isFetchingImages: boolean;
   isResetting: boolean;
@@ -30,7 +27,6 @@ export const Header: React.FC<HeaderProps> = ({
   activeTab, setActiveTab,
   searchQuery, setSearchQuery,
   isScanning, setIsScanning,
-  selectedDept, setSelectedDept, departments,
   isUploading, isFetchingImages, isResetting,
   setShowResetConfirm, fetchProgress,
   batchFetchImages, stopFetchImages,
@@ -93,98 +89,84 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {activeTab === 'inventory' && (
-            <>
-              <select
-                value={selectedDept}
-                onChange={(e) => setSelectedDept(e.target.value)}
-                className="bg-emerald-800/50 border border-emerald-700 text-white rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400"
-              >
-                <option value="">All Departments</option>
-                {departments.map(dept => (
-                  <option key={dept} value={dept}>{dept}</option>
-                ))}
-              </select>
-              {/* Admin Panel Toggle */}
-              <div className="relative">
-                <input
-                  type="file"
-                  accept=".csv"
-                  className="hidden"
-                  ref={fileInputRef}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleFileUpload(file as any);
-                  }}
-                />
+          {/* Admin Panel Toggle - Present everywhere */}
+          <div className="relative">
+            <input
+              type="file"
+              accept=".csv"
+              className="hidden"
+              ref={fileInputRef}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleFileUpload(file as any);
+              }}
+            />
+            
+            <button
+              onClick={() => setShowAdminPanel(!showAdminPanel)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl font-medium transition-colors border ${showAdminPanel ? 'bg-emerald-700 text-white border-emerald-600' : 'bg-emerald-800/50 text-emerald-100 hover:bg-emerald-700/50 border-emerald-700'}`}
+              title="Database Settings"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+
+            {/* Admin Dropdown */}
+            {showAdminPanel && (
+              <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-stone-200 overflow-hidden z-20 flex flex-col">
+                <div className="p-3 bg-stone-50 border-b border-stone-200">
+                  <h3 className="text-xs font-bold text-stone-500 uppercase tracking-wider">Admin Actions</h3>
+                  <p className="text-xs text-stone-400 mt-0.5">Manage your local database.</p>
+                </div>
                 
-                <button
-                  onClick={() => setShowAdminPanel(!showAdminPanel)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-colors border ${showAdminPanel ? 'bg-emerald-700 text-white border-emerald-600' : 'bg-emerald-800/50 text-emerald-100 hover:bg-emerald-700/50 border-emerald-700'}`}
-                >
-                  <span className="hidden sm:inline">Database Management</span>
-                  <span className="sm:hidden">Admin</span>
-                </button>
+                <div className="p-2 space-y-1">
+                  <button
+                    onClick={() => {
+                      fileInputRef.current?.click();
+                      setShowAdminPanel(false);
+                    }}
+                    disabled={isUploading || isFetchingImages || isResetting}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors disabled:opacity-50 text-left"
+                  >
+                    <Upload className="w-4 h-4" />
+                    {isUploading ? 'Syncing...' : 'Sync CSV Inventory'}
+                  </button>
 
-                {/* Admin Dropdown */}
-                {showAdminPanel && (
-                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-stone-200 overflow-hidden z-20 flex flex-col">
-                    <div className="p-3 bg-stone-50 border-b border-stone-200">
-                      <h3 className="text-xs font-bold text-stone-500 uppercase tracking-wider">Admin Actions</h3>
-                      <p className="text-xs text-stone-400 mt-0.5">Manage your local database.</p>
-                    </div>
-                    
-                    <div className="p-2 space-y-1">
-                      <button
-                        onClick={() => {
-                          fileInputRef.current?.click();
-                          setShowAdminPanel(false);
-                        }}
-                        disabled={isUploading || isFetchingImages || isResetting}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors disabled:opacity-50 text-left"
-                      >
-                        <Upload className="w-4 h-4" />
-                        {isUploading ? 'Syncing CSV...' : 'Sync CSV Inventory'}
+                  {isFetchingImages ? (
+                    <div className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium text-red-700 bg-red-50">
+                      <button onClick={stopFetchImages} className="flex items-center gap-3 hover:text-red-900 transition-colors">
+                        <X className="w-4 h-4" /> Stop Fetch
                       </button>
-
-                      {isFetchingImages ? (
-                        <div className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium text-red-700 bg-red-50">
-                          <button onClick={stopFetchImages} className="flex items-center gap-3 hover:text-red-900 transition-colors">
-                            <X className="w-4 h-4" /> Stop Fetch
-                          </button>
-                          <span className="text-xs">{fetchProgress.current}/{fetchProgress.total}</span>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            batchFetchImages();
-                            setShowAdminPanel(false);
-                          }}
-                          disabled={isUploading || isResetting}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors disabled:opacity-50 text-left"
-                        >
-                          <ImageIcon className="w-4 h-4" /> Auto-Fetch Images
-                        </button>
-                      )}
-
-                      <div className="my-1 border-t border-stone-100"></div>
-
-                      <button
-                        onClick={() => {
-                          setShowResetConfirm(true);
-                          setShowAdminPanel(false);
-                        }}
-                        disabled={isFetchingImages || isUploading || isResetting}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-800 transition-colors disabled:opacity-50 text-left"
-                      >
-                        <Trash2 className="w-4 h-4" /> Clear All Data
-                      </button>
+                      <span className="text-xs">{fetchProgress.current}/{fetchProgress.total}</span>
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <button
+                      onClick={() => {
+                        batchFetchImages();
+                        setShowAdminPanel(false);
+                      }}
+                      disabled={isUploading || isResetting}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors disabled:opacity-50 text-left"
+                    >
+                      <ImageIcon className="w-4 h-4" /> Auto-Fetch Images
+                    </button>
+                  )}
+
+                  <div className="my-1 border-t border-stone-100"></div>
+
+                  <button
+                    onClick={() => {
+                      setShowResetConfirm(true);
+                      setShowAdminPanel(false);
+                    }}
+                    disabled={isFetchingImages || isUploading || isResetting}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-800 transition-colors disabled:opacity-50 text-left"
+                  >
+                    <Trash2 className="w-4 h-4" /> Clear All Data
+                  </button>
+                </div>
               </div>
-            </>
-          )}
+            )}
+          </div>
         </div>
       </div>
 

@@ -6,9 +6,6 @@ interface SidebarProps {
   setIsSidebarOpen: (v: boolean) => void;
   activeTab: 'inventory' | 'verify' | 'reports';
   setActiveTab: (t: 'inventory' | 'verify' | 'reports') => void;
-  selectedDept: string;
-  setSelectedDept: (d: string) => void;
-  departments: string[];
   isUploading: boolean;
   isFetchingImages: boolean;
   isResetting: boolean;
@@ -23,7 +20,6 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({
   isSidebarOpen, setIsSidebarOpen,
   activeTab, setActiveTab,
-  selectedDept, setSelectedDept, departments,
   isUploading, isFetchingImages, isResetting,
   setShowResetConfirm, fetchProgress,
   batchFetchImages, stopFetchImages, fileInputRef
@@ -75,17 +71,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {activeTab === 'inventory' && (
             <div className="flex flex-col gap-4">
               <h3 className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-1">Inventory Actions</h3>
-              
-              <select
-                value={selectedDept}
-                onChange={(e) => { setSelectedDept(e.target.value); setIsSidebarOpen(false); }}
-                className="bg-emerald-800 border border-emerald-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-400 w-full"
-              >
-                <option value="">All Departments</option>
-                {departments.map(dept => (
-                  <option key={dept} value={dept}>{dept}</option>
-                ))}
-              </select>
 
               <button
                 onClick={() => { fileInputRef.current?.click(); setIsSidebarOpen(false); }}

@@ -23,7 +23,6 @@ export default function App() {
         activeTab={activeTab} setActiveTab={setActiveTab}
         searchQuery={searchQuery} setSearchQuery={setSearchQuery}
         isScanning={isScanning} setIsScanning={setIsScanning}
-        selectedDept={inventory.selectedDept} setSelectedDept={inventory.setSelectedDept} departments={inventory.departments}
         isUploading={inventory.isUploading} isFetchingImages={inventory.isFetchingImages} isResetting={inventory.isResetting}
         setShowResetConfirm={inventory.setShowResetConfirm} fetchProgress={inventory.fetchProgress}
         batchFetchImages={inventory.batchFetchImages}        stopFetchImages={inventory.stopFetchImages}
@@ -34,7 +33,6 @@ export default function App() {
       <Sidebar
         isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen}
         activeTab={activeTab} setActiveTab={setActiveTab}
-        selectedDept={inventory.selectedDept} setSelectedDept={inventory.setSelectedDept} departments={inventory.departments}
         isUploading={inventory.isUploading} isFetchingImages={inventory.isFetchingImages} isResetting={inventory.isResetting}
         showResetConfirm={inventory.showResetConfirm} setShowResetConfirm={inventory.setShowResetConfirm}
         fetchProgress={inventory.fetchProgress}
@@ -75,6 +73,9 @@ export default function App() {
             <InventoryTab
               products={inventory.products}
               visibleCount={inventory.visibleCount}
+              selectedDept={inventory.selectedDept}
+              setSelectedDept={inventory.setSelectedDept}
+              departments={inventory.departments}
               editingSku={inventory.editingSku}
               editLocation={inventory.editLocation} setEditLocation={inventory.setEditLocation}
               editImageUrl={inventory.editImageUrl} setEditImageUrl={inventory.setEditImageUrl}

@@ -21,15 +21,36 @@ interface InventoryTabProps {
   cancelEditing: () => void;
   saveEdits: (sku: string) => void;
   openImageSelector: (sku: string) => void;
+  selectedDept: string;
+  setSelectedDept: (d: string) => void;
+  departments: string[];
 }
 
 export const InventoryTab: React.FC<InventoryTabProps> = ({
   products, visibleCount, editingSku, editLocation, setEditLocation,
   editImageUrl, setEditImageUrl, startEditing, cancelEditing, saveEdits,
-  openImageSelector
+  openImageSelector, selectedDept, setSelectedDept, departments
 }) => {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    <div className="flex flex-col gap-6">
+      {/* Department Filter Header */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-stone-800">
+          Showing {products.length} Items {selectedDept ? `in ${selectedDept}` : ''}
+        </h2>
+        <select
+          value={selectedDept}
+          onChange={(e) => setSelectedDept(e.target.value)}
+          className="bg-white border border-stone-300 text-stone-700 font-medium rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm"
+        >
+          <option value="">All Departments</option>
+          {departments.map(dept => (
+            <option key={dept} value={dept}>{dept}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
       {products.slice(0, visibleCount).map((product) => (
         <div key={product.sku} className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden hover:shadow-md transition-shadow flex flex-col">
           {/* Product Image Area */}
@@ -165,6 +186,7 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({
           <p>Upload your inventory CSV to get started, or try a different search.</p>
         </div>
       )}
+    </div>
     </div>
   );
 };
