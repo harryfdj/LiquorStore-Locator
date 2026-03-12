@@ -1,0 +1,66 @@
+import express from 'express';
+import db from '../db';
+
+const router = express.Router();
+
+
+
+// Finalize Weekly Report
+router.post('/finalize', (req, res) => {
+  try {
+    // 1. Get current stats
+    const stats = db.prepare(`
+      SELECT 
+        COUNT(*) as total_scanned,
+        SUM(CASE WHEN status = 'matched' THEN 1 ELSE 0 END) as total_matched,
+        SUM(CASE WHEN status = 'mismatched' THEN 1 ELSE 0 END) as total_mismatched
+      FROM stock_verifications
+      WHERE report_id IS NULL
+    `).get() as any;
+
+    if (stats.total_scanned === 0) {
+      return res.status(400).json({ error: 'No verifications to finalize' });
+    }
+
+    // 2. Insert into weekly_reports
+    const stmt = db.prepare(`
+      INSERT INTO weekly_reports (total_scanned, total_matched, total_mismatched)
+      VALUES (?, ?, ?)
+    `);
+    const result = stmt.run(stats.total_scanned, stats.total_matched || 0, stats.total_mismatched || 0);
+    const newReportId = result.lastInsertRowid;
+
+    // 3. Link verifications to the new report instead of deleting them
+    const updateStmt = db.prepare(`UPDATE stock_verifications SET report_id = ? WHERE report_id IS NULL`);
+    updateStmt.run(newReportId);
+
+    res.json({ success: true, message: 'Weekly report finalized', report_id: newReportId });
+  } catch (error) {
+    console.error('Error finalizing report:', error);
+    res.status(500).json({ error: 'Failed to finalize report' });
+  }
+});
+
+// Get Historical Weekly Reports
+router.get('/', (req, res) => {
+  try {
+    const reports = db.prepare('SELECT * FROM weekly_reports ORDER BY created_at DESC').all();
+    res.json(reports);
+  } catch (error) {
+    console.error('Error fetching reports:', error);
+    res.status(500).json({ error: 'Failed to fetch reports' });
+  }
+});
+
+// Get specific items for a historical report
+router.get('/:id/items', (req, res) => {
+  try {
+    const items = db.prepare('SELECT * FROM stock_verifications WHERE report_id = ? ORDER BY created_at DESC').all(req.params.id);
+    res.json(items);
+  } catch (error) {
+    console.error('Error fetching report items:', error);
+    res.status(500).json({ error: 'Failed to fetch report items' });
+  }
+});
+
+export default router;
