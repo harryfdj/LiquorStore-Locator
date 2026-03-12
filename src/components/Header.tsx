@@ -11,8 +11,6 @@ interface HeaderProps {
   setIsScanning: (s: boolean) => void;
   isUploading: boolean;
   isFetchingImages: boolean;
-  isResetting: boolean;
-  setShowResetConfirm: (v: boolean) => void;
   fetchProgress: { current: number; total: number; found: number };
   batchFetchImages: () => void;
   stopFetchImages: () => void;
@@ -27,8 +25,8 @@ export const Header: React.FC<HeaderProps> = ({
   activeTab, setActiveTab,
   searchQuery, setSearchQuery,
   isScanning, setIsScanning,
-  isUploading, isFetchingImages, isResetting,
-  setShowResetConfirm, fetchProgress,
+  isUploading, isFetchingImages,
+  fetchProgress,
   batchFetchImages, stopFetchImages,
   fileInputRef, handleFileUpload,
   setIsSidebarOpen, showAdminPanel, setShowAdminPanel
@@ -124,7 +122,7 @@ export const Header: React.FC<HeaderProps> = ({
                       fileInputRef.current?.click();
                       setShowAdminPanel(false);
                     }}
-                    disabled={isUploading || isFetchingImages || isResetting}
+                    disabled={isUploading || isFetchingImages}
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors disabled:opacity-50 text-left"
                   >
                     <Upload className="w-4 h-4" />
@@ -144,25 +142,12 @@ export const Header: React.FC<HeaderProps> = ({
                         batchFetchImages();
                         setShowAdminPanel(false);
                       }}
-                      disabled={isUploading || isResetting}
+                      disabled={isUploading}
                       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors disabled:opacity-50 text-left"
                     >
                       <ImageIcon className="w-4 h-4" /> Auto-Fetch Images
                     </button>
                   )}
-
-                  <div className="my-1 border-t border-stone-100"></div>
-
-                  <button
-                    onClick={() => {
-                      setShowResetConfirm(true);
-                      setShowAdminPanel(false);
-                    }}
-                    disabled={isFetchingImages || isUploading || isResetting}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-800 transition-colors disabled:opacity-50 text-left"
-                  >
-                    <Trash2 className="w-4 h-4" /> Clear All Data
-                  </button>
                 </div>
               </div>
             )}

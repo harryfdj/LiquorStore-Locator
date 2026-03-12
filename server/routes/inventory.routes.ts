@@ -194,24 +194,6 @@ router.get('/:sku/image-candidates', async (req, res) => {
   }
 });
 
-// Clear all data (reset database)
-router.delete('/', (req, res) => {
-  try {
-    req.db!.exec('DELETE FROM products');
-    
-    // Also delete all locally downloaded images for this specific store
-    const storeId = (req.user as any).storeId;
-    const imagesDir = path.join(process.cwd(), 'public', `product-images-${storeId}`);
-    if (fs.existsSync(imagesDir)) {
-      fs.rmSync(imagesDir, { recursive: true, force: true });
-    }
-    
-    res.json({ success: true, message: 'Database and images cleared' });
-  } catch (error) {
-    console.error('Error clearing database:', error);
-    res.status(500).json({ error: 'Failed to clear database' });
-  }
-});
 
 // Upload CSV and sync inventory
 router.post('/upload', upload.single('file'), (req, res) => {

@@ -7,8 +7,6 @@ export function useInventory(searchQuery: string) {
   const [departments, setDepartments] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isFetchingImages, setIsFetchingImages] = useState(false);
-  const [isResetting, setIsResetting] = useState(false);
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [fetchProgress, setFetchProgress] = useState({ current: 0, total: 0, found: 0 });
   const [uploadMessage, setUploadMessage] = useState<{type: 'success'|'error', text: string} | null>(null);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
@@ -68,23 +66,6 @@ export function useInventory(searchQuery: string) {
     return () => clearTimeout(debounce);
   }, [searchQuery, selectedDept]);
 
-  const handleResetDatabase = async () => {
-    setIsResetting(true);
-    try {
-      const res = await fetch('/api/products', { method: 'DELETE' });
-      if (res.ok) {
-        setProducts([]);
-        setUploadMessage({ type: 'success', text: 'Database completely cleared.' });
-      } else {
-        throw new Error('Failed to reset database');
-      }
-    } catch (error) {
-      setUploadMessage({ type: 'error', text: 'Failed to clear database.' });
-    } finally {
-      setIsResetting(false);
-      setShowResetConfirm(false);
-    }
-  };
 
   const handleFileUpload = async (file: File) => {
     if (!file) return;
@@ -265,11 +246,11 @@ export function useInventory(searchQuery: string) {
   return {
     products, setProducts,
     selectedDept, setSelectedDept, departments,
-    isUploading, isFetchingImages, isResetting,
-    showResetConfirm, setShowResetConfirm, fetchProgress,
+    isUploading, isFetchingImages,
+    fetchProgress,
     uploadMessage, setUploadMessage,
     fileInputRef, handleFileUpload,
-    handleResetDatabase, stopFetchImages, batchFetchImages,
+    stopFetchImages, batchFetchImages,
     editingSku, editLocation, setEditLocation, editImageUrl, setEditImageUrl,
     startEditing, cancelEditing, saveEdits,
     imageSelectorSku, setImageSelectorSku, imageCandidates, isLoadingCandidates,

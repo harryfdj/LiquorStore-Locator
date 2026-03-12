@@ -8,9 +8,6 @@ interface SidebarProps {
   setActiveTab: (t: 'inventory' | 'verify' | 'reports') => void;
   isUploading: boolean;
   isFetchingImages: boolean;
-  isResetting: boolean;
-  showResetConfirm: boolean;
-  setShowResetConfirm: (v: boolean) => void;
   fetchProgress: { current: number; total: number; found: number };
   batchFetchImages: () => void;
   stopFetchImages: () => void;
@@ -20,8 +17,7 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({
   isSidebarOpen, setIsSidebarOpen,
   activeTab, setActiveTab,
-  isUploading, isFetchingImages, isResetting,
-  setShowResetConfirm, fetchProgress,
+  isUploading, isFetchingImages, fetchProgress,
   batchFetchImages, stopFetchImages, fileInputRef
 }) => {
   return (
@@ -74,7 +70,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
               <button
                 onClick={() => { fileInputRef.current?.click(); setIsSidebarOpen(false); }}
-                disabled={isUploading || isFetchingImages || isResetting}
+                disabled={isUploading || isFetchingImages}
                 className="flex items-center gap-3 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-3 rounded-xl font-medium transition-colors disabled:opacity-50 w-full"
               >
                 <Upload className="w-5 h-5" />
@@ -97,22 +93,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
               ) : (
                 <button
                   onClick={() => { batchFetchImages(); setIsSidebarOpen(false); }}
-                  disabled={isUploading || isResetting}
+                  disabled={isUploading}
                   className="flex items-center gap-3 bg-stone-700 hover:bg-stone-600 text-white px-4 py-3 rounded-xl font-medium transition-colors disabled:opacity-50 w-full"
                 >
                   <ImageIcon className="w-5 h-5" />
                   <span>Auto-Fetch Images</span>
                 </button>
               )}
-
-              <button
-                onClick={() => { setShowResetConfirm(true); setIsSidebarOpen(false); }}
-                disabled={isFetchingImages || isUploading || isResetting}
-                className="flex items-center gap-3 bg-red-900/50 hover:bg-red-800 text-red-100 px-4 py-3 rounded-xl font-medium transition-colors disabled:opacity-50 border border-red-800 w-full mt-4"
-              >
-                <Trash2 className="w-5 h-5" />
-                <span>Clear Data</span>
-              </button>
             </div>
           )}
         </div>

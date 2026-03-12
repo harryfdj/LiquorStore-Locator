@@ -84,6 +84,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
     }
   };
 
+  const handleClearStoreData = async (id: number, name: string) => {
+    if (!window.confirm(`Are you sure you want to completely CLEAR ALL DATA for the store "${name}"? This deletes products, images, and reports, but keeps the store itself.`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/admin/stores/${id}/data`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        alert('Successfully cleared data for ' + name);
+      } else {
+        alert('Failed to clear store data');
+      }
+    } catch (e) {
+      alert('Network error');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-stone-100 text-stone-900 font-sans pb-12">
       <header className="bg-stone-900 flex items-center justify-between p-4 shadow-md sticky top-0 z-20 text-white border-b-4 border-emerald-500">
@@ -192,13 +212,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
                       </div>
                     </div>
                   </div>
-                  
-                  <button
-                    onClick={() => handleDeleteStore(store.id, store.name)}
-                    className="p-2 sm:px-4 sm:py-2 text-red-600 bg-red-50 hover:bg-red-600 hover:text-white rounded-xl transition-colors font-semibold text-sm border border-red-200 flex items-center gap-2 self-end sm:self-auto"
-                  >
-                    <Trash2 className="w-4 h-4" /> <span className="hidden sm:inline">Delete Tenant</span>
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2 mt-3 sm:mt-0 sl:ml-auto">
+                    <button
+                      onClick={() => handleClearStoreData(store.id, store.name)}
+                      className="p-2 sm:px-4 sm:py-2 text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-xl transition-colors font-semibold text-sm border border-stone-200 flex items-center gap-2"
+                    >
+                      <Trash2 className="w-4 h-4" /> <span className="hidden sm:inline">Clear Data</span>
+                    </button>
+                    <button
+                      onClick={() => handleDeleteStore(store.id, store.name)}
+                      className="p-2 sm:px-4 sm:py-2 text-red-600 bg-red-50 hover:bg-red-600 hover:text-white rounded-xl transition-colors font-semibold text-sm border border-red-200 flex items-center gap-2"
+                    >
+                      <Trash2 className="w-4 h-4" /> <span className="hidden sm:inline">Delete Tenant</span>
+                    </button>
+                  </div>
                 </div>
               ))
             )}

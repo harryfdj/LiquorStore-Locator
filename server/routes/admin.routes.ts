@@ -1,5 +1,5 @@
 import express from 'express';
-import { adminDb } from '../dbManager';
+import { adminDb, getStoreDb } from '../dbManager';
 import { requireAdmin } from '../middlewares/auth';
 import path from 'path';
 import fs from 'fs';
@@ -45,6 +45,27 @@ router.delete('/stores/:id', (req, res) => {
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete store' });
+  }
+});
+
+router.delete('/stores/:id/data', (req, res) => {
+  const { id } = req.params;
+  try {
+    const storeDb = getStoreDb(Number(id));
+    storeDb.exec('DELETE FROM products');
+    storeDb.exec('DELETE FROM verifications');
+    storeDb.exec('DELETE FROM weekly_reports');
+    
+    // Also delete all locally downloaded images for this specific store
+    const imagesDir = path.join(process.cwd(), 'public', `product-images-${id}`);
+    if (fs.existsSync(imagesDir)) {
+      fs.rmSync(imagesDir, { recursive: true, force: true });
+    }
+
+    res.json({ success: true, message: 'Store data cleared' });
+  } catch (error) {
+    console.error('Failed to clear store data:', error);
+    res.status(500).json({ error: 'Failed to clear store data', details: error instanceof Error ? error.message : String(error) });
   }
 });
 

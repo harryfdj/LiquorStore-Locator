@@ -6,7 +6,6 @@ import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { InventoryTab } from './components/InventoryTab';
 import { ImageSelectorModal } from './components/ImageSelectorModal';
-import { ResetConfirmModal } from './components/ResetConfirmModal';
 import { useInventory } from './hooks/useInventory';
 
 import { LoginScreen } from './components/LoginScreen';
@@ -88,8 +87,8 @@ function StoreApp({ user, onLogout }: { user: any, onLogout: () => void }) {
         activeTab={activeTab} setActiveTab={setActiveTab}
         searchQuery={searchQuery} setSearchQuery={setSearchQuery}
         isScanning={isScanning} setIsScanning={setIsScanning}
-        isUploading={inventory.isUploading} isFetchingImages={inventory.isFetchingImages} isResetting={inventory.isResetting}
-        setShowResetConfirm={inventory.setShowResetConfirm} fetchProgress={inventory.fetchProgress}
+        isUploading={inventory.isUploading} isFetchingImages={inventory.isFetchingImages}
+        fetchProgress={inventory.fetchProgress}
         batchFetchImages={inventory.batchFetchImages} stopFetchImages={inventory.stopFetchImages}
         fileInputRef={inventory.fileInputRef} handleFileUpload={inventory.handleFileUpload as any}
         setIsSidebarOpen={setIsSidebarOpen} showAdminPanel={inventory.showAdminPanel} setShowAdminPanel={inventory.setShowAdminPanel}
@@ -98,8 +97,7 @@ function StoreApp({ user, onLogout }: { user: any, onLogout: () => void }) {
       <Sidebar
         isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen}
         activeTab={activeTab} setActiveTab={setActiveTab}
-        isUploading={inventory.isUploading} isFetchingImages={inventory.isFetchingImages} isResetting={inventory.isResetting}
-        showResetConfirm={inventory.showResetConfirm} setShowResetConfirm={inventory.setShowResetConfirm}
+        isUploading={inventory.isUploading} isFetchingImages={inventory.isFetchingImages}
         fetchProgress={inventory.fetchProgress}
         batchFetchImages={inventory.batchFetchImages} stopFetchImages={inventory.stopFetchImages}
         fileInputRef={inventory.fileInputRef}
@@ -118,13 +116,6 @@ function StoreApp({ user, onLogout }: { user: any, onLogout: () => void }) {
               products={inventory.products}
               setImageSelectorSku={inventory.setImageSelectorSku}
               selectImage={inventory.selectImage}
-            />
-
-            <ResetConfirmModal
-              showResetConfirm={inventory.showResetConfirm}
-              setShowResetConfirm={inventory.setShowResetConfirm}
-              handleResetDatabase={inventory.handleResetDatabase}
-              isResetting={inventory.isResetting}
             />
 
             {inventory.uploadMessage && (
