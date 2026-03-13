@@ -7,6 +7,7 @@ import { Sidebar } from './components/Sidebar';
 import { InventoryTab } from './components/InventoryTab';
 import { ImageSelectorModal } from './components/ImageSelectorModal';
 import { useInventory } from './hooks/useInventory';
+import { usePhysicalScanner } from './hooks/usePhysicalScanner';
 
 import { LoginScreen } from './components/LoginScreen';
 import { AdminDashboard } from './components/AdminDashboard';
@@ -74,6 +75,11 @@ function StoreApp({ user, onLogout }: { user: any, onLogout: () => void }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const inventory = useInventory(searchQuery);
+
+  // Global Physical Barcode Scanner listener
+  usePhysicalScanner((barcode) => {
+    setSearchQuery(barcode);
+  });
 
   return (
     <div className="min-h-screen bg-stone-100 text-stone-900 font-sans">
