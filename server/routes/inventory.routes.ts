@@ -56,10 +56,10 @@ router.get('/', (req, res) => {
   }
 });
 
-// Update a product's location or image
+// Update a product's location, image, or upcs
 router.put('/:sku', async (req, res) => {
   const { sku } = req.params;
-  const { location } = req.body;
+  const { location, alt_upcs } = req.body;
   let { image_url } = req.body;
 
   try {
@@ -75,10 +75,11 @@ router.put('/:sku', async (req, res) => {
     const stmt = req.db!.prepare(`
       UPDATE products 
       SET location = COALESCE(?, location), 
-          image_url = COALESCE(?, image_url)
+          image_url = COALESCE(?, image_url),
+          alt_upcs = COALESCE(?, alt_upcs)
       WHERE sku = ?
     `);
-    stmt.run(location, image_url, sku);
+    stmt.run(location, image_url, alt_upcs !== undefined ? alt_upcs : null, sku);
     res.json({ success: true, image_url });
   } catch (error) {
     console.error('Error updating product:', error);

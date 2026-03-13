@@ -6,3 +6,9 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Ignore local tenant databases and their dynamically scraped images
+store_*.db
+inventory.db
+admin.db
+public/product-images-*/
