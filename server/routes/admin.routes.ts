@@ -53,7 +53,7 @@ router.delete('/stores/:id/data', (req, res) => {
   try {
     const storeDb = getStoreDb(Number(id));
     storeDb.exec('DELETE FROM products');
-    storeDb.exec('DELETE FROM verifications');
+    storeDb.exec('DELETE FROM stock_verifications');
     storeDb.exec('DELETE FROM weekly_reports');
     
     // Also delete all locally downloaded images for this specific store
