@@ -34,9 +34,14 @@ export function getStoreDb(storeId: number): Database.Database {
       image_url TEXT,
       category TEXT,
       mainupc TEXT,
-      depname TEXT
+      depname TEXT,
+      alt_upcs TEXT DEFAULT ''
     )
   `);
+
+  try {
+    db.exec(`ALTER TABLE products ADD COLUMN alt_upcs TEXT DEFAULT ''`);
+  } catch (e) {}
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS stock_verifications (

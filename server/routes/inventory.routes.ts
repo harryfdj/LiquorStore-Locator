@@ -14,7 +14,7 @@ const upload = multer({ dest: 'uploads/' });
 router.get('/upc/:upc', (req, res) => {
   try {
     const upc = req.params.upc;
-    const product = req.db!.prepare('SELECT * FROM products WHERE mainupc = ? OR sku = ?').get(upc, upc);
+    const product = req.db!.prepare('SELECT * FROM products WHERE mainupc = ? OR sku = ? OR alt_upcs LIKE ?').get(upc, upc, '%' + upc + '%');
     if (product) {
       res.json(product);
     } else {
@@ -34,9 +34,9 @@ router.get('/', (req, res) => {
   let params: any[] = [];
 
   if (search) {
-    query += ' AND (name LIKE ? OR sku LIKE ? OR location LIKE ? OR mainupc LIKE ?)';
+    query += ' AND (name LIKE ? OR sku LIKE ? OR location LIKE ? OR mainupc LIKE ? OR alt_upcs LIKE ?)';
     const searchTerm = `%${search}%`;
-    params.push(searchTerm, searchTerm, searchTerm, searchTerm);
+    params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
   }
 
   if (department) {
@@ -209,8 +209,8 @@ router.post('/upload', upload.single('file'), (req, res) => {
     .on('end', () => {
       try {
         const insertOrUpdate = req.db!.prepare(`
-          INSERT INTO products (sku, name, size, pack, price, stock, location, image_url, category, mainupc, depname)
-          VALUES (@sku, @name, @size, @pack, @price, @stock, COALESCE((SELECT location FROM products WHERE sku = @sku), ''), COALESCE((SELECT image_url FROM products WHERE sku = @sku), ''), @category, @mainupc, @depname)
+          INSERT INTO products (sku, name, size, pack, price, stock, location, image_url, category, mainupc, depname, alt_upcs)
+          VALUES (@sku, @name, @size, @pack, @price, @stock, COALESCE((SELECT location FROM products WHERE sku = @sku), ''), COALESCE((SELECT image_url FROM products WHERE sku = @sku), ''), @category, @mainupc, @depname, '')
           ON CONFLICT(sku) DO UPDATE SET
             name = excluded.name,
             size = excluded.size,
@@ -218,7 +218,12 @@ router.post('/upload', upload.single('file'), (req, res) => {
             price = excluded.price,
             stock = excluded.stock,
             category = excluded.category,
-            mainupc = excluded.mainupc,
+            mainupc = CASE WHEN products.mainupc = '' THEN excluded.mainupc ELSE products.mainupc END,
+            alt_upcs = CASE 
+              WHEN excluded.mainupc != '' AND excluded.mainupc != products.mainupc AND instr(products.alt_upcs, excluded.mainupc) = 0 THEN
+                CASE WHEN products.alt_upcs = '' THEN excluded.mainupc ELSE products.alt_upcs || ',' || excluded.mainupc END
+              ELSE products.alt_upcs
+            END,
             depname = excluded.depname
         `);
 
