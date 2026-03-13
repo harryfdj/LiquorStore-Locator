@@ -17,6 +17,8 @@ interface InventoryTabProps {
   setEditLocation: (v: string) => void;
   editImageUrl: string;
   setEditImageUrl: (v: string) => void;
+  editAltUpcs: string;
+  setEditAltUpcs: (v: string) => void;
   startEditing: (p: Product) => void;
   cancelEditing: () => void;
   saveEdits: (sku: string) => void;
@@ -28,7 +30,8 @@ interface InventoryTabProps {
 
 export const InventoryTab: React.FC<InventoryTabProps> = ({
   products, visibleCount, editingSku, editLocation, setEditLocation,
-  editImageUrl, setEditImageUrl, startEditing, cancelEditing, saveEdits,
+  editImageUrl, setEditImageUrl, editAltUpcs, setEditAltUpcs, 
+  startEditing, cancelEditing, saveEdits,
   openImageSelector, selectedDept, setSelectedDept, departments
 }) => {
   return (
@@ -122,10 +125,15 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({
             </div>
 
             {product.mainupc && (
-              <div className="flex justify-center mb-4 p-2 bg-stone-50 rounded-xl border border-stone-100 overflow-hidden">
+              <div className="flex justify-center mb-4 p-2 bg-stone-50 rounded-xl border border-stone-100 overflow-hidden flex-col items-center">
                 <div className="flex flex-col items-center scale-75 origin-center">
                   <Barcode value={product.mainupc} format="CODE128" width={1.5} height={40} fontSize={12} background="transparent" />
                 </div>
+                {product.alt_upcs && (
+                  <div className="text-xs text-stone-400 mt-1 max-w-full truncate text-center" title={`Alt UPCs: ${product.alt_upcs}`}>
+                    + {product.alt_upcs.split(',').length} Alt UPCs
+                  </div>
+                )}
               </div>
             )}
 
@@ -150,6 +158,16 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({
                     onChange={e => setEditImageUrl(e.target.value)}
                     className="w-full border border-stone-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
                     placeholder="https://..."
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-stone-500 block mb-1">Alternate UPCs (comma separated)</label>
+                  <input 
+                    type="text" 
+                    value={editAltUpcs} 
+                    onChange={e => setEditAltUpcs(e.target.value)}
+                    className="w-full border border-stone-300 rounded-lg px-3 py-1.5 text-sm font-mono focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                    placeholder="1234, 5678"
                   />
                 </div>
                 <div className="flex gap-2 pt-1">

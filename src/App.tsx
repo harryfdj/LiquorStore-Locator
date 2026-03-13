@@ -141,6 +141,7 @@ function StoreApp({ user, onLogout }: { user: any, onLogout: () => void }) {
               editingSku={inventory.editingSku}
               editLocation={inventory.editLocation} setEditLocation={inventory.setEditLocation}
               editImageUrl={inventory.editImageUrl} setEditImageUrl={inventory.setEditImageUrl}
+              editAltUpcs={inventory.editAltUpcs} setEditAltUpcs={inventory.setEditAltUpcs}
               startEditing={inventory.startEditing}
               cancelEditing={inventory.cancelEditing}
               saveEdits={inventory.saveEdits}

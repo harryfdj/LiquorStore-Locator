@@ -10,6 +10,7 @@ export interface Product {
   category: string;
   mainupc: string;
   depname: string;
+  alt_upcs?: string;
 }
 
 export interface Verification {

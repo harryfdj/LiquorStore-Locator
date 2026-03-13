@@ -18,6 +18,7 @@ export function useInventory(searchQuery: string) {
   const [editingSku, setEditingSku] = useState<string | null>(null);
   const [editLocation, setEditLocation] = useState('');
   const [editImageUrl, setEditImageUrl] = useState('');
+  const [editAltUpcs, setEditAltUpcs] = useState('');
 
   // Image Selector State
   const [imageSelectorSku, setImageSelectorSku] = useState<string | null>(null);
@@ -177,12 +178,14 @@ export function useInventory(searchQuery: string) {
     setEditingSku(product.sku);
     setEditLocation(product.location || '');
     setEditImageUrl(product.image_url || '');
+    setEditAltUpcs(product.alt_upcs || '');
   };
 
   const cancelEditing = () => {
     setEditingSku(null);
     setEditLocation('');
     setEditImageUrl('');
+    setEditAltUpcs('');
   };
 
   const saveEdits = async (sku: string) => {
@@ -190,12 +193,12 @@ export function useInventory(searchQuery: string) {
       const res = await fetch(`/api/products/${sku}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ location: editLocation, image_url: editImageUrl }),
+        body: JSON.stringify({ location: editLocation, image_url: editImageUrl, alt_upcs: editAltUpcs }),
       });
 
       if (res.ok) {
         setProducts(products.map(p => 
-          p.sku === sku ? { ...p, location: editLocation, image_url: editImageUrl } : p
+          p.sku === sku ? { ...p, location: editLocation, image_url: editImageUrl, alt_upcs: editAltUpcs } : p
         ));
         setEditingSku(null);
       }
@@ -251,7 +254,7 @@ export function useInventory(searchQuery: string) {
     uploadMessage, setUploadMessage,
     fileInputRef, handleFileUpload,
     stopFetchImages, batchFetchImages,
-    editingSku, editLocation, setEditLocation, editImageUrl, setEditImageUrl,
+    editingSku, editLocation, setEditLocation, editImageUrl, setEditImageUrl, editAltUpcs, setEditAltUpcs,
     startEditing, cancelEditing, saveEdits,
     imageSelectorSku, setImageSelectorSku, imageCandidates, isLoadingCandidates,
     openImageSelector, selectImage,
