@@ -39,26 +39,26 @@ export function getStoreDb(storeId: number): Database.Database {
   `);
 
   db.exec(`
-    CREATE TABLE IF NOT EXISTS verifications (
+    CREATE TABLE IF NOT EXISTS stock_verifications (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      sku TEXT NOT NULL,
-      system_stock INTEGER NOT NULL,
-      actual_stock INTEGER NOT NULL,
-      status TEXT NOT NULL,
+      sku TEXT,
+      mainupc TEXT,
+      name TEXT,
+      system_stock INTEGER,
+      actual_stock INTEGER,
+      status TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (sku) REFERENCES products(sku)
+      report_id INTEGER DEFAULT NULL
     )
   `);
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS weekly_reports (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      report_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-      total_items INTEGER NOT NULL,
-      matched_items INTEGER NOT NULL,
-      mismatched_items INTEGER NOT NULL,
-      accuracy_percentage REAL NOT NULL,
-      report_data TEXT NOT NULL
+      total_scanned INTEGER,
+      total_matched INTEGER,
+      total_mismatched INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
 

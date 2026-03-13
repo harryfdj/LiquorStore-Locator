@@ -6,6 +6,8 @@ interface AdminDashboardProps {
   onLogout: () => void;
 }
 
+import { AdminConfirmModal } from './AdminConfirmModal';
+
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout }) => {
   const [stores, setStores] = useState<any[]>([]);
   const [newStoreName, setNewStoreName] = useState('');
@@ -13,6 +15,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Modal State
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    type: 'clear' | 'delete' | null;
+    store: any | null;
+    isLoading: boolean;
+  }>({
+    isOpen: false,
+    type: null,
+    store: null,
+    isLoading: false
+  });
 
   const fetchStores = async () => {
     try {
@@ -64,44 +79,49 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
     }
   };
 
-  const handleDeleteStore = async (id: number, name: string) => {
-    if (!window.confirm(`Are you extremely sure you want to completely DELETE the store "${name}" and erase ALL of its isolated inventory, pictures, and reports permanently?`)) {
-      return;
-    }
+  const confirmAction = async () => {
+    if (!modalConfig.store || !modalConfig.type) return;
+
+    setModalConfig(prev => ({ ...prev, isLoading: true }));
+    const { store, type } = modalConfig;
 
     try {
-      const res = await fetch(`/api/admin/stores/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        setStores(stores.filter(s => s.id !== id));
-      } else {
-        alert('Failed to delete store');
+      if (type === 'delete') {
+        const res = await fetch(`/api/admin/stores/${store.id}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          setStores(stores.filter(s => s.id !== store.id));
+        } else {
+          alert('Failed to delete store');
+        }
+      } else if (type === 'clear') {
+        const res = await fetch(`/api/admin/stores/${store.id}/data`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          setSuccessMsg(`Successfully cleared all data for ${store.name}`);
+          setTimeout(() => setSuccessMsg(''), 3000);
+        } else {
+          alert('Failed to clear store data');
+        }
       }
     } catch (e) {
       alert('Network error');
+    } finally {
+      setModalConfig({ isOpen: false, type: null, store: null, isLoading: false });
     }
   };
 
-  const handleClearStoreData = async (id: number, name: string) => {
-    if (!window.confirm(`Are you sure you want to completely CLEAR ALL DATA for the store "${name}"? This deletes products, images, and reports, but keeps the store itself.`)) {
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/admin/stores/${id}/data`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        alert('Successfully cleared data for ' + name);
-      } else {
-        alert('Failed to clear store data');
-      }
-    } catch (e) {
-      alert('Network error');
-    }
+  const openConfirmModal = (store: any, type: 'clear' | 'delete') => {
+    setModalConfig({
+      isOpen: true,
+      type,
+      store,
+      isLoading: false
+    });
   };
 
   return (
@@ -214,13 +234,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
                   </div>
                   <div className="flex flex-wrap items-center gap-2 mt-3 sm:mt-0 sl:ml-auto">
                     <button
-                      onClick={() => handleClearStoreData(store.id, store.name)}
+                      onClick={() => openConfirmModal(store, 'clear')}
                       className="p-2 sm:px-4 sm:py-2 text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-xl transition-colors font-semibold text-sm border border-stone-200 flex items-center gap-2"
                     >
                       <Trash2 className="w-4 h-4" /> <span className="hidden sm:inline">Clear Data</span>
                     </button>
                     <button
-                      onClick={() => handleDeleteStore(store.id, store.name)}
+                      onClick={() => openConfirmModal(store, 'delete')}
                       className="p-2 sm:px-4 sm:py-2 text-red-600 bg-red-50 hover:bg-red-600 hover:text-white rounded-xl transition-colors font-semibold text-sm border border-red-200 flex items-center gap-2"
                     >
                       <Trash2 className="w-4 h-4" /> <span className="hidden sm:inline">Delete Tenant</span>
@@ -232,6 +252,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
           </div>
         </section>
       </main>
+
+      <AdminConfirmModal
+        isOpen={modalConfig.isOpen}
+        onClose={() => setModalConfig({ ...modalConfig, isOpen: false })}
+        onConfirm={confirmAction}
+        isLoading={modalConfig.isLoading}
+        title={modalConfig.type === 'delete' ? 'Delete Store Permanently?' : 'Clear All Store Data?'}
+        message={
+          modalConfig.type === 'delete' 
+            ? `Are you extremely sure you want to completely DELETE the store "${modalConfig.store?.name}"? This will erase all products, images, and reports permanently. This action cannot be undone.`
+            : `Are you sure you want to clear all data for "${modalConfig.store?.name}"? This will delete all products, images, and reports, but the store account will remain active.`
+        }
+        confirmText={modalConfig.type === 'delete' ? 'Delete Permanently' : 'Clear All Data'}
+        variant={modalConfig.type === 'delete' ? 'danger' : 'warning'}
+      />
     </div>
   );
 };
