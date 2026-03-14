@@ -8,9 +8,14 @@ adminDb.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    csv_mapping TEXT DEFAULT '{}'
   )
 `);
+
+try {
+  adminDb.exec(`ALTER TABLE stores ADD COLUMN csv_mapping TEXT DEFAULT '{}'`);
+} catch (e) {}
 
 const storeDbs = new Map<number, Database.Database>();
 

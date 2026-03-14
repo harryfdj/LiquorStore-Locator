@@ -10,8 +10,11 @@ router.use(requireAdmin);
 
 router.get('/stores', (req, res) => {
   try {
-    const stores = adminDb.prepare('SELECT id, name, created_at, password FROM stores ORDER BY id DESC').all();
-    res.json(stores);
+    const stores = adminDb.prepare('SELECT id, name, created_at, password, csv_mapping FROM stores ORDER BY id DESC').all();
+    res.json(stores.map((s: any) => ({
+      ...s,
+      csv_mapping: s.csv_mapping ? JSON.parse(s.csv_mapping) : {}
+    })));
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch stores' });
   }
@@ -66,6 +69,22 @@ router.delete('/stores/:id/data', (req, res) => {
   } catch (error) {
     console.error('Failed to clear store data:', error);
     res.status(500).json({ error: 'Failed to clear store data', details: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+router.put('/stores/:id/mapping', (req, res) => {
+  const { id } = req.params;
+  const { mapping } = req.body;
+  if (!mapping || typeof mapping !== 'object') {
+    return res.status(400).json({ error: 'Valid mapping object required' });
+  }
+
+  try {
+    adminDb.prepare('UPDATE stores SET csv_mapping = ? WHERE id = ?').run(JSON.stringify(mapping), id);
+    res.json({ success: true, mapping });
+  } catch (error) {
+    console.error('Failed to update mapping:', error);
+    res.status(500).json({ error: 'Failed to update mapping' });
   }
 });
 

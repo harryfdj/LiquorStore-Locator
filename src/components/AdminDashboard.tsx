@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Store, Plus, Trash2, Shield, LogOut, Check, Lock, ChevronRight } from 'lucide-react';
+import { Package, Store, Plus, Trash2, Shield, LogOut, Check, Lock, ChevronRight, Settings } from 'lucide-react';
 
 interface AdminDashboardProps {
   token: string;
@@ -7,6 +7,7 @@ interface AdminDashboardProps {
 }
 
 import { AdminConfirmModal } from './AdminConfirmModal';
+import { CsvMappingModal } from './CsvMappingModal';
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout }) => {
   const [stores, setStores] = useState<any[]>([]);
@@ -27,6 +28,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
     type: null,
     store: null,
     isLoading: false
+  });
+
+  const [mappingModalConfig, setMappingModalConfig] = useState<{
+    isOpen: boolean;
+    store: any | null;
+  }>({
+    isOpen: false,
+    store: null
   });
 
   const fetchStores = async () => {
@@ -234,6 +243,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
                   </div>
                   <div className="flex flex-wrap items-center gap-2 mt-3 sm:mt-0 sl:ml-auto">
                     <button
+                      onClick={() => setMappingModalConfig({ isOpen: true, store })}
+                      className="p-2 sm:px-4 sm:py-2 text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-xl transition-colors font-semibold text-sm border border-stone-200 flex items-center gap-2"
+                    >
+                      <Settings className="w-4 h-4" /> <span className="hidden sm:inline">CSV Settings</span>
+                    </button>
+                    <button
                       onClick={() => openConfirmModal(store, 'clear')}
                       className="p-2 sm:px-4 sm:py-2 text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-xl transition-colors font-semibold text-sm border border-stone-200 flex items-center gap-2"
                     >
@@ -266,6 +281,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
         }
         confirmText={modalConfig.type === 'delete' ? 'Delete Permanently' : 'Clear All Data'}
         variant={modalConfig.type === 'delete' ? 'danger' : 'warning'}
+      />
+
+      <CsvMappingModal
+        isOpen={mappingModalConfig.isOpen}
+        onClose={() => setMappingModalConfig({ isOpen: false, store: null })}
+        store={mappingModalConfig.store}
+        token={token}
+        onSuccess={(updatedStore) => {
+          setStores(stores.map(s => s.id === updatedStore.id ? updatedStore : s));
+        }}
       />
     </div>
   );

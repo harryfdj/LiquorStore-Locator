@@ -3,6 +3,7 @@ import multer from 'multer';
 import { parse } from 'csv-parse';
 import fs from 'fs';
 import path from 'path';
+import { adminDb } from '../dbManager';
 import { searchImages, scoreImageMatch, downloadImage } from '../services/scraper';
 
 const router = express.Router();
@@ -92,7 +93,7 @@ router.post('/:sku/fetch-image', async (req, res) => {
   const { sku } = req.params;
   try {
     const product = req.db!.prepare('SELECT name, size FROM products WHERE sku = ?').get(sku) as any;
-    
+
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
     }
@@ -160,7 +161,7 @@ router.get('/:sku/image-candidates', async (req, res) => {
   try {
     const stmt = req.db!.prepare('SELECT name FROM products WHERE sku = ?');
     const product = stmt.get(sku) as any;
-    
+
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
     }
@@ -202,8 +203,21 @@ router.post('/upload', upload.single('file'), (req, res) => {
     return res.status(400).json({ error: 'No file uploaded' });
   }
 
+  const storeId = (req.user as any)?.storeId;
+  let customMapping: any = {};
+  if (storeId) {
+    try {
+      const storeRow = adminDb.prepare('SELECT csv_mapping FROM stores WHERE id = ?').get(storeId) as any;
+      if (storeRow && storeRow.csv_mapping) {
+        customMapping = JSON.parse(storeRow.csv_mapping);
+      }
+    } catch (e) {
+      console.error('Error fetching custom mapping:', e);
+    }
+  }
+
   const results: any[] = [];
-  
+
   fs.createReadStream(req.file.path)
     .pipe(parse({ columns: true, skip_empty_lines: true, bom: true, trim: true, relax_quotes: true, relax_column_count: true }))
     .on('data', (data) => results.push(data))
@@ -228,23 +242,42 @@ router.post('/upload', upload.single('file'), (req, res) => {
             depname = excluded.depname
         `);
 
+        // Helper to pull value either from custom mapping key OR fallback
+        const getValue = (item: any, mapKey: string, fallbacks: string[]) => {
+          if (customMapping[mapKey] && item[customMapping[mapKey]] !== undefined) {
+            return item[customMapping[mapKey]];
+          }
+          for (const fallback of fallbacks) {
+            if (item[fallback] !== undefined) return item[fallback];
+          }
+          return undefined;
+        };
+
         const transaction = req.db!.transaction((items) => {
           for (const item of items) {
-            const sku = item.sku || item.SKU;
-            const name = item.description || item.ITEMNAME;
-            
+            const sku = getValue(item, 'sku', ['sku', 'SKU']);
+            const name = getValue(item, 'name', ['description', 'ITEMNAME']);
+
             if (!sku || !name) continue;
+
+            const size = getValue(item, 'size', ['SizeName']) || '';
+            const pack = getValue(item, 'pack', ['PackName']) || '';
+            const priceVal = getValue(item, 'price', ['priceperunit', 'ItemPrice']);
+            const stockVal = getValue(item, 'stock', ['totalqty', 'TOTALQTY_MULTI']);
+            const category = getValue(item, 'category', ['catname', 'ItemTypeDesc']) || '';
+            const mainupc = getValue(item, 'mainupc', ['mainupc']) || '';
+            const depname = getValue(item, 'depname', ['depname']) || '';
 
             insertOrUpdate.run({
               sku: sku,
               name: name,
-              size: item.SizeName || '',
-              pack: item.PackName || '',
-              price: parseFloat(item.priceperunit || item.ItemPrice) || 0,
-              stock: parseInt(item.totalqty || item.TOTALQTY_MULTI) || 0,
-              category: item.catname || item.ItemTypeDesc || '',
-              mainupc: item.mainupc || '',
-              depname: item.depname || ''
+              size: size,
+              pack: pack,
+              price: parseFloat(priceVal) || 0,
+              stock: parseInt(stockVal) || 0,
+              category: category,
+              mainupc: mainupc,
+              depname: depname
             });
           }
         });
