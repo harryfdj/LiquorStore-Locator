@@ -10,7 +10,7 @@ router.use(requireAdmin);
 
 router.get('/stores', (req, res) => {
   try {
-    const stores = adminDb.prepare('SELECT id, name, created_at, password, csv_mapping FROM stores ORDER BY id DESC').all();
+    const stores = adminDb.prepare('SELECT id, name, created_at, password, csv_mapping, lat, lng, radius_miles FROM stores ORDER BY id DESC').all();
     res.json(stores.map((s: any) => ({
       ...s,
       csv_mapping: s.csv_mapping ? JSON.parse(s.csv_mapping) : {}
@@ -85,6 +85,24 @@ router.put('/stores/:id/mapping', (req, res) => {
   } catch (error) {
     console.error('Failed to update mapping:', error);
     res.status(500).json({ error: 'Failed to update mapping' });
+  }
+});
+
+router.put('/stores/:id/location', (req, res) => {
+  const { id } = req.params;
+  const { lat, lng, radius_miles } = req.body;
+  
+  try {
+    adminDb.prepare('UPDATE stores SET lat = ?, lng = ?, radius_miles = ? WHERE id = ?').run(
+      lat ?? null, 
+      lng ?? null, 
+      radius_miles ?? null, 
+      id
+    );
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Failed to update store location:', error);
+    res.status(500).json({ error: 'Failed to update store location' });
   }
 });
 

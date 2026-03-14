@@ -8,6 +8,8 @@ interface AdminDashboardProps {
 
 import { AdminConfirmModal } from './AdminConfirmModal';
 import { CsvMappingModal } from './CsvMappingModal';
+import { LocationModal } from './LocationModal';
+import { MapPin } from 'lucide-react';
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout }) => {
   const [stores, setStores] = useState<any[]>([]);
@@ -31,6 +33,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
   });
 
   const [mappingModalConfig, setMappingModalConfig] = useState<{
+    isOpen: boolean;
+    store: any | null;
+  }>({
+    isOpen: false,
+    store: null
+  });
+
+  const [locationModalConfig, setLocationModalConfig] = useState<{
     isOpen: boolean;
     store: any | null;
   }>({
@@ -243,6 +253,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
                   </div>
                   <div className="flex flex-wrap items-center gap-2 mt-3 sm:mt-0 sl:ml-auto">
                     <button
+                      onClick={() => setLocationModalConfig({ isOpen: true, store })}
+                      className="p-2 sm:px-4 sm:py-2 text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-xl transition-colors font-semibold text-sm border border-stone-200 flex items-center gap-2"
+                    >
+                      <MapPin className="w-4 h-4" /> <span className="hidden sm:inline">Location GeoFence</span>
+                    </button>
+                    <button
                       onClick={() => setMappingModalConfig({ isOpen: true, store })}
                       className="p-2 sm:px-4 sm:py-2 text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-xl transition-colors font-semibold text-sm border border-stone-200 flex items-center gap-2"
                     >
@@ -287,6 +303,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
         isOpen={mappingModalConfig.isOpen}
         onClose={() => setMappingModalConfig({ isOpen: false, store: null })}
         store={mappingModalConfig.store}
+        token={token}
+        onSuccess={(updatedStore) => {
+          setStores(stores.map(s => s.id === updatedStore.id ? updatedStore : s));
+        }}
+      />
+
+      <LocationModal
+        isOpen={locationModalConfig.isOpen}
+        onClose={() => setLocationModalConfig({ isOpen: false, store: null })}
+        store={locationModalConfig.store}
         token={token}
         onSuccess={(updatedStore) => {
           setStores(stores.map(s => s.id === updatedStore.id ? updatedStore : s));

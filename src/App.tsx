@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Check, X, AlertCircle } from 'lucide-react';
 import { StockVerify } from './components/StockVerify';
 import { VerificationReports } from './components/VerificationReports';
@@ -11,6 +11,7 @@ import { usePhysicalScanner } from './hooks/usePhysicalScanner';
 
 import { LoginScreen } from './components/LoginScreen';
 import { AdminDashboard } from './components/AdminDashboard';
+import { GeoFence } from './components/GeoFence';
 import { LogOut } from 'lucide-react';
 
 // Setup Global Fetch Interceptor for Auth Token
@@ -73,8 +74,28 @@ function StoreApp({ user, onLogout }: { user: any, onLogout: () => void }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isScanning, setIsScanning] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [storeConfig, setStoreConfig] = useState<any>({
+    lat: user.lat,
+    lng: user.lng,
+    radiusMiles: user.radius_miles
+  });
 
   const inventory = useInventory(searchQuery);
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(r => r.json())
+      .then(data => {
+        if (data.role === 'store') {
+          setStoreConfig({
+            lat: data.lat,
+            lng: data.lng,
+            radiusMiles: data.radius_miles
+          });
+        }
+      })
+      .catch(e => console.error("Could not fetch store config", e));
+  }, []);
 
   // Global Physical Barcode Scanner listener
   usePhysicalScanner((barcode) => {
@@ -82,13 +103,14 @@ function StoreApp({ user, onLogout }: { user: any, onLogout: () => void }) {
   });
 
   return (
-    <div className="min-h-screen bg-stone-100 text-stone-900 font-sans">
-      <div className="bg-emerald-950 text-emerald-100 text-xs py-1.5 px-4 text-center flex justify-between items-center sm:px-8">
-        <span className="font-medium">Connected to: <strong className="text-white">{user.storeName}</strong></span>
-        <button onClick={onLogout} className="flex items-center gap-1.5 hover:text-white transition-colors">
-          <LogOut className="w-3 h-3" /> Disconnect
-        </button>
-      </div>
+    <GeoFence storeLat={storeConfig.lat} storeLng={storeConfig.lng} radiusMiles={storeConfig.radiusMiles}>
+      <div className="min-h-screen bg-stone-100 text-stone-900 font-sans">
+        <div className="bg-emerald-950 text-emerald-100 text-xs py-1.5 px-4 text-center flex justify-between items-center sm:px-8">
+          <span className="font-medium">Connected to: <strong className="text-white">{user.storeName}</strong></span>
+          <button onClick={onLogout} className="flex items-center gap-1.5 hover:text-white transition-colors">
+            <LogOut className="w-3 h-3" /> Disconnect
+          </button>
+        </div>
       <Header
         activeTab={activeTab} setActiveTab={setActiveTab}
         searchQuery={searchQuery} setSearchQuery={setSearchQuery}
@@ -151,5 +173,6 @@ function StoreApp({ user, onLogout }: { user: any, onLogout: () => void }) {
         )}
       </main>
     </div>
+    </GeoFence>
   );
 }

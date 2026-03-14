@@ -9,12 +9,21 @@ adminDb.exec(`
     name TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    csv_mapping TEXT DEFAULT '{}'
+    csv_mapping TEXT DEFAULT '{}',
+    lat REAL,
+    lng REAL,
+    radius_miles REAL
   )
 `);
 
 try {
   adminDb.exec(`ALTER TABLE stores ADD COLUMN csv_mapping TEXT DEFAULT '{}'`);
+} catch (e) {}
+
+try {
+  adminDb.exec(`ALTER TABLE stores ADD COLUMN lat REAL`);
+  adminDb.exec(`ALTER TABLE stores ADD COLUMN lng REAL`);
+  adminDb.exec(`ALTER TABLE stores ADD COLUMN radius_miles REAL`);
 } catch (e) {}
 
 const storeDbs = new Map<number, Database.Database>();
