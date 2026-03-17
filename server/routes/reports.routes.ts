@@ -56,7 +56,13 @@ router.get('/', (req, res) => {
 // Get specific items for a historical report
 router.get('/:id/items', (req, res) => {
   try {
-    const items = req.db!.prepare('SELECT * FROM stock_verifications WHERE report_id = ? ORDER BY created_at DESC').all(req.params.id);
+    const items = req.db!.prepare(`
+      SELECT sv.*, p.image_url 
+      FROM stock_verifications sv 
+      LEFT JOIN products p ON sv.sku = p.sku 
+      WHERE sv.report_id = ? 
+      ORDER BY sv.created_at DESC
+    `).all(req.params.id);
     res.json(items);
   } catch (error) {
     console.error('Error fetching report items:', error);

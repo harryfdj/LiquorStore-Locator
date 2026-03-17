@@ -15,8 +15,12 @@ const upload = multer({ dest: 'uploads/' });
 router.get('/upc/:upc', (req, res) => {
   try {
     const upc = req.params.upc;
-    const product = req.db!.prepare('SELECT * FROM products WHERE mainupc = ? OR sku = ? OR alt_upcs LIKE ?').get(upc, upc, '%' + upc + '%');
+    const product = req.db!.prepare('SELECT * FROM products WHERE mainupc = ? OR sku = ? OR alt_upcs LIKE ?').get(upc, upc, '%' + upc + '%') as any;
     if (product) {
+      const existing = req.db!.prepare('SELECT status, actual_stock FROM stock_verifications WHERE sku = ? AND report_id IS NULL').get(product.sku) as any;
+      if (existing) {
+        product.existing_verification = existing;
+      }
       res.json(product);
     } else {
       res.status(404).json({ error: 'Product not found' });

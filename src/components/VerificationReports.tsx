@@ -162,7 +162,7 @@ export function VerificationReports() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left border-collapse min-w-[700px]">
                 <thead>
                   <tr className="bg-stone-50 border-b border-stone-200">
                     <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider">Date</th>
@@ -178,12 +178,23 @@ export function VerificationReports() {
                     const diff = v.actual_stock - v.system_stock;
                     return (
                       <tr key={v.id} className="border-b border-stone-100 hover:bg-stone-50 transition-colors">
-                        <td className="p-4 text-sm text-stone-500 whitespace-nowrap">
+                        <td className="p-4 text-sm text-stone-500 whitespace-nowrap align-middle">
                           {new Date(v.created_at).toLocaleDateString()},<br/>
-                          <span className="text-xs text-stone-400 mt-1 block">{new Date(v.created_at).toLocaleTimeString()}</span>
+                          <span className="block mt-1">{new Date(v.created_at).toLocaleTimeString()}</span>
                         </td>
-                        <td className="p-4 font-medium text-stone-800">{v.name}</td>
-                        <td className="p-4 flex flex-col items-center justify-center">
+                        <td className="p-4 align-middle">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-16 bg-white rounded-lg border border-stone-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
+                              {v.image_url ? (
+                                <img src={v.image_url} alt={v.name} className="w-full h-full object-contain mix-blend-multiply" loading="lazy" />
+                              ) : (
+                                <FileText className="w-6 h-6 text-stone-300" />
+                              )}
+                            </div>
+                            <span className="font-bold text-stone-800 leading-tight">{v.name}</span>
+                          </div>
+                        </td>
+                        <td className="p-4 flex flex-col items-center justify-center align-middle">
                           {v.mainupc ? (
                             <div className="overflow-hidden mix-blend-multiply opacity-80 scale-90 origin-center">
                               <Barcode value={v.mainupc} format="CODE128" width={1.5} height={30} fontSize={12} background="transparent" />
@@ -227,7 +238,7 @@ export function VerificationReports() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left border-collapse min-w-[700px]">
                 <thead>
                   <tr className="bg-stone-50 border-b border-stone-200">
                     <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider">Date</th>
@@ -242,12 +253,23 @@ export function VerificationReports() {
                   {matches.map((v) => {
                     return (
                       <tr key={v.id} className="border-b border-stone-100 hover:bg-stone-50 transition-colors">
-                        <td className="p-4 text-sm text-stone-500 whitespace-nowrap">
+                        <td className="p-4 text-sm text-stone-500 whitespace-nowrap align-middle">
                           {new Date(v.created_at).toLocaleDateString()},<br/>
-                          <span className="text-xs text-stone-400 mt-1 block">{new Date(v.created_at).toLocaleTimeString()}</span>
+                          <span className="block mt-1">{new Date(v.created_at).toLocaleTimeString()}</span>
                         </td>
-                        <td className="p-4 font-medium text-stone-800">{v.name}</td>
-                        <td className="p-4 flex flex-col items-center justify-center">
+                        <td className="p-4 align-middle">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-16 bg-white rounded-lg border border-stone-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
+                              {v.image_url ? (
+                                <img src={v.image_url} alt={v.name} className="w-full h-full object-contain mix-blend-multiply" loading="lazy" />
+                              ) : (
+                                <FileText className="w-6 h-6 text-stone-300" />
+                              )}
+                            </div>
+                            <span className="font-bold text-stone-800 leading-tight">{v.name}</span>
+                          </div>
+                        </td>
+                        <td className="p-4 flex flex-col items-center justify-center align-middle">
                           {v.mainupc ? (
                             <div className="overflow-hidden mix-blend-multiply opacity-80 scale-90 origin-center">
                               <Barcode value={v.mainupc} format="CODE128" width={1.5} height={30} fontSize={12} background="transparent" />
@@ -343,30 +365,55 @@ export function VerificationReports() {
                                       <table className="w-full text-left text-sm">
                                         <thead className="bg-stone-50 text-xs uppercase text-stone-500 font-medium">
                                           <tr>
+                                            <th className="px-4 py-3">Date</th>
                                             <th className="px-4 py-3">Product</th>
                                             <th className="px-4 py-3 text-center">Barcode / UPC</th>
                                             <th className="px-4 py-3 text-right">System</th>
                                             <th className="px-4 py-3 text-right">Actual</th>
+                                            <th className="px-4 py-3 text-right">Diff</th>
                                           </tr>
                                         </thead>
                                         <tbody className="divide-y divide-stone-100">
-                                          {expandedItems.filter(i => i.status === 'mismatched').map(item => (
-                                            <tr key={item.id} className="hover:bg-stone-50">
-                                              <td className="px-4 py-3 font-medium text-stone-800">{item.name}</td>
-                                              <td className="px-4 py-3 flex flex-col items-center justify-center">
-                                                {item.mainupc ? (
-                                                  <div className="overflow-hidden mix-blend-multiply opacity-80 scale-75 origin-center -my-2">
-                                                    <Barcode value={item.mainupc} format="CODE128" width={1.5} height={30} fontSize={12} background="transparent" />
+                                          {expandedItems.filter(i => i.status === 'mismatched').map(item => {
+                                            const diff = item.actual_stock - item.system_stock;
+                                            return (
+                                              <tr key={item.id} className="hover:bg-stone-50">
+                                                <td className="px-4 py-3 text-stone-500 whitespace-nowrap align-middle">
+                                                  {new Date(item.created_at).toLocaleDateString()}<br/>
+                                                  <span className="block mt-1">{new Date(item.created_at).toLocaleTimeString()}</span>
+                                                </td>
+                                                <td className="px-4 py-3 align-middle">
+                                                  <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-10 bg-white rounded border border-stone-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
+                                                      {item.image_url ? (
+                                                        <img src={item.image_url} alt={item.name} className="w-full h-full object-contain mix-blend-multiply" loading="lazy" />
+                                                      ) : (
+                                                        <FileText className="w-4 h-4 text-stone-300" />
+                                                      )}
+                                                    </div>
+                                                    <span className="font-semibold text-stone-800 leading-tight">{item.name}</span>
                                                   </div>
-                                                ) : (
-                                                  <span className="text-sm text-stone-400">No Barcode</span>
-                                                )}
-                                                <span className="text-xs text-stone-400 mt-1">{item.sku}</span>
-                                              </td>
-                                              <td className="px-4 py-3 text-right text-stone-600">{item.system_stock}</td>
-                                              <td className="px-4 py-3 text-right font-bold text-red-600">{item.actual_stock}</td>
-                                            </tr>
-                                          ))}
+                                                </td>
+                                                <td className="px-4 py-3 flex flex-col items-center justify-center align-middle">
+                                                  {item.mainupc ? (
+                                                    <div className="overflow-hidden mix-blend-multiply opacity-80 scale-75 origin-center -my-2">
+                                                      <Barcode value={item.mainupc} format="CODE128" width={1.5} height={30} fontSize={12} background="transparent" />
+                                                    </div>
+                                                  ) : (
+                                                    <span className="text-sm text-stone-400">No Barcode</span>
+                                                  )}
+                                                  <span className="text-xs text-stone-400 mt-1">{item.sku}</span>
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-stone-600 align-middle">{item.system_stock}</td>
+                                                <td className="px-4 py-3 text-right font-bold text-red-600 align-middle">{item.actual_stock}</td>
+                                                <td className="px-4 py-3 text-right font-bold align-middle">
+                                                  <span className={`px-2 py-1 rounded-md text-xs ${diff > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                                    {diff > 0 ? '+' : ''}{diff}
+                                                  </span>
+                                                </td>
+                                              </tr>
+                                            );
+                                          })}
                                         </tbody>
                                       </table>
                                     </div>
@@ -381,17 +428,34 @@ export function VerificationReports() {
                                       <table className="w-full text-left text-sm">
                                         <thead className="bg-stone-50 text-xs uppercase text-stone-500 font-medium">
                                           <tr>
+                                            <th className="px-4 py-3">Date</th>
                                             <th className="px-4 py-3">Product</th>
                                             <th className="px-4 py-3 text-center">Barcode / UPC</th>
                                             <th className="px-4 py-3 text-right">System</th>
                                             <th className="px-4 py-3 text-right">Actual</th>
+                                            <th className="px-4 py-3 text-right">Status</th>
                                           </tr>
                                         </thead>
                                         <tbody className="divide-y divide-stone-100">
                                           {expandedItems.filter(i => i.status === 'matched').map(item => (
                                             <tr key={item.id} className="hover:bg-stone-50">
-                                              <td className="px-4 py-3 font-medium text-stone-800">{item.name}</td>
-                                              <td className="px-4 py-3 flex flex-col items-center justify-center">
+                                              <td className="px-4 py-3 text-stone-500 whitespace-nowrap align-middle">
+                                                {new Date(item.created_at).toLocaleDateString()}<br/>
+                                                <span className="block mt-1">{new Date(item.created_at).toLocaleTimeString()}</span>
+                                              </td>
+                                              <td className="px-4 py-3 align-middle">
+                                                <div className="flex items-center gap-3">
+                                                  <div className="w-8 h-10 bg-white rounded border border-stone-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
+                                                    {item.image_url ? (
+                                                      <img src={item.image_url} alt={item.name} className="w-full h-full object-contain mix-blend-multiply" loading="lazy" />
+                                                    ) : (
+                                                      <FileText className="w-4 h-4 text-stone-300" />
+                                                    )}
+                                                  </div>
+                                                  <span className="font-semibold text-stone-800 leading-tight">{item.name}</span>
+                                                </div>
+                                              </td>
+                                              <td className="px-4 py-3 flex flex-col items-center justify-center align-middle">
                                                 {item.mainupc ? (
                                                   <div className="overflow-hidden mix-blend-multiply opacity-80 scale-75 origin-center -my-2">
                                                     <Barcode value={item.mainupc} format="CODE128" width={1.5} height={30} fontSize={12} background="transparent" />
@@ -401,8 +465,11 @@ export function VerificationReports() {
                                                 )}
                                                 <span className="text-xs text-stone-400 mt-1">{item.sku}</span>
                                               </td>
-                                              <td className="px-4 py-3 text-right text-stone-600">{item.system_stock}</td>
-                                              <td className="px-4 py-3 text-right font-bold text-emerald-600">{item.actual_stock}</td>
+                                              <td className="px-4 py-3 text-right text-stone-600 align-middle">{item.system_stock}</td>
+                                              <td className="px-4 py-3 text-right font-bold text-emerald-600 align-middle">{item.actual_stock}</td>
+                                              <td className="px-4 py-3 text-right font-bold align-middle">
+                                                <span className="px-2 py-1 rounded-md text-xs bg-emerald-100 text-emerald-700">Perfect</span>
+                                              </td>
                                             </tr>
                                           ))}
                                         </tbody>

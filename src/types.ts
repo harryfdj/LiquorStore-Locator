@@ -11,6 +11,10 @@ export interface Product {
   mainupc: string;
   depname: string;
   alt_upcs?: string;
+  existing_verification?: {
+    status: 'matched' | 'mismatched';
+    actual_stock: number;
+  };
 }
 
 export interface Verification {

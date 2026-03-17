@@ -14,6 +14,7 @@ export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
   const [actualStock, setActualStock] = useState<number | ''>('');
   const [isMismatched, setIsMismatched] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [isOverriding, setIsOverriding] = useState(false);
 
   const fetchProductByUpc = async (searchUpc: string) => {
     if (!searchUpc.trim()) {
@@ -25,6 +26,7 @@ export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
     setError('');
     setProduct(null);
     setIsMismatched(false);
+    setIsOverriding(false);
     setActualStock('');
     setSuccessMessage('');
 
@@ -91,7 +93,14 @@ export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
   const handleMismatchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (product && actualStock !== '') {
-      submitVerification('mismatched', Number(actualStock));
+      const stockNum = Number(actualStock);
+      const systemStock = product.stock ?? 0;
+      
+      if (stockNum === systemStock) {
+        submitVerification('matched', stockNum);
+      } else {
+        submitVerification('mismatched', stockNum);
+      }
     }
   };
 
@@ -130,7 +139,8 @@ export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
               
               <div className="flex-1">
                 <h3 className="text-2xl font-bold text-stone-800 mb-2">{product.name}</h3>
-                <div className="text-stone-500 space-y-1 mb-4">
+                <div className="text-stone-500 space-y-1 mb-6">
+                  <p className="text-lg text-stone-600 mb-2">Price: <span className="font-bold text-stone-900">${product.price != null ? product.price.toFixed(2) : '0.00'}</span></p>
                   <p>UPC: <span className="font-mono text-stone-700">{product.mainupc || 'N/A'}</span></p>
                   <p>SKU: <span className="font-mono text-stone-700">{product.sku}</span></p>
                   <p>Location: <span className="font-medium text-stone-700">{product.location || 'None'}</span></p>
@@ -144,17 +154,45 @@ export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
             </div>
 
             <div className="mt-8 border-t border-stone-100 pt-6">
-              {!isMismatched ? (
+              {product.existing_verification && !isOverriding ? (
+                <div className="bg-amber-50 rounded-xl p-6 border border-amber-200">
+                  <div className="flex items-center gap-3 mb-4 text-amber-800">
+                    <AlertCircle className="w-6 h-6" />
+                    <h4 className="font-bold text-lg">Already Scanned</h4>
+                  </div>
+                  <p className="text-amber-800 mb-6">
+                    This item was already verified as <strong className="uppercase">{product.existing_verification.status}</strong> 
+                    {product.existing_verification.status === 'mismatched' && <span> with an actual stock of <strong>{product.existing_verification.actual_stock}</strong> (System had: {product.stock ?? 0})</span>}.
+                  </p>
+                  <button 
+                    onClick={() => {
+                      setIsOverriding(true);
+                      if (product.existing_verification?.status === 'mismatched') {
+                         setIsMismatched(true);
+                         setActualStock(product.existing_verification.actual_stock);
+                      }
+                    }} 
+                    className="w-full bg-amber-600 text-white py-3 justify-center rounded-xl font-bold flex items-center gap-2 hover:bg-amber-700 transition"
+                  >
+                    Change Verification?
+                  </button>
+                </div>
+              ) : !isMismatched ? (
                 <div>
                   <p className="text-center text-stone-600 mb-4 font-medium text-lg">Does the rack have exactly {product.stock ?? 0} items?</p>
                   <div className="flex gap-4">
-                    <button onClick={handleMatch} className="flex-1 bg-emerald-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2">
+                    <button onClick={handleMatch} className="flex-1 bg-emerald-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 shadow-sm hover:shadow">
                       <Check className="w-6 h-6" /> Yes, Match
                     </button>
-                    <button onClick={() => setIsMismatched(true)} className="flex-1 bg-red-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2">
+                    <button onClick={() => setIsMismatched(true)} className="flex-1 bg-red-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2 shadow-sm hover:shadow">
                       <X className="w-6 h-6" /> No, Mismatch
                     </button>
                   </div>
+                  {product.existing_verification && isOverriding && (
+                    <button onClick={() => setIsOverriding(false)} className="w-full mt-4 text-stone-500 hover:text-stone-800 font-medium py-2">
+                      Cancel Override
+                    </button>
+                  )}
                 </div>
               ) : (
                 <form onSubmit={handleMismatchSubmit} className="bg-red-50 p-6 rounded-xl border border-red-100">
@@ -165,15 +203,18 @@ export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
                       value={actualStock}
                       onChange={(e) => setActualStock(e.target.value === '' ? '' : Number(e.target.value))}
                       placeholder="Actual quantity..."
-                      className="flex-1 px-4 py-3 border border-red-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 text-lg"
+                      className="flex-1 px-4 py-3 border border-red-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 text-lg shadow-inner"
                       required
                       min="0"
                       autoFocus
                     />
-                    <button type="submit" className="bg-red-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-red-700 transition-colors">
+                    <button type="submit" className="bg-red-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-red-700 transition-colors shadow-sm">
                       Save Update
                     </button>
-                    <button type="button" onClick={() => setIsMismatched(false)} className="bg-stone-200 text-stone-700 px-6 py-3 rounded-xl font-bold hover:bg-stone-300 transition-colors">
+                    <button type="button" onClick={() => {
+                      setIsMismatched(false);
+                      if (product.existing_verification) setIsOverriding(false);
+                    }} className="bg-white border border-stone-200 text-stone-700 px-6 py-3 rounded-xl font-bold hover:bg-stone-50 transition-colors shadow-sm">
                       Cancel
                     </button>
                   </div>
