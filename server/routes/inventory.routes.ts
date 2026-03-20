@@ -15,7 +15,20 @@ const upload = multer({ dest: 'uploads/' });
 router.get('/upc/:upc', (req, res) => {
   try {
     const upc = req.params.upc;
-    const product = req.db!.prepare('SELECT * FROM products WHERE mainupc = ? OR sku = ? OR alt_upcs LIKE ?').get(upc, upc, '%' + upc + '%') as any;
+    
+    // 1. Exact match pass
+    let product = req.db!.prepare('SELECT * FROM products WHERE mainupc = ? OR sku = ? OR alt_upcs LIKE ?').get(upc, upc, '%' + upc + '%') as any;
+    
+    // 2. Fallback fuzzy prefix match pass (handles dropped check digits)
+    if (!product && upc.length >= 8) {
+      product = req.db!.prepare(`
+        SELECT * FROM products 
+        WHERE mainupc LIKE ? OR alt_upcs LIKE ? 
+        ORDER BY LENGTH(mainupc) ASC 
+        LIMIT 1
+      `).get(upc + '%', '%' + upc + '%') as any;
+    }
+
     if (product) {
       const existing = req.db!.prepare('SELECT status, actual_stock FROM stock_verifications WHERE sku = ? AND report_id IS NULL').get(product.sku) as any;
       if (existing) {
