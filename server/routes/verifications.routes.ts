@@ -29,7 +29,7 @@ router.post('/', (req, res) => {
 router.get('/', (req, res) => {
   try {
     const verifications = req.db!.prepare(`
-      SELECT sv.*, p.image_url 
+      SELECT sv.*, p.image_url, p.cost, p.price 
       FROM stock_verifications sv 
       LEFT JOIN products p ON sv.sku = p.sku 
       WHERE sv.report_id IS NULL 

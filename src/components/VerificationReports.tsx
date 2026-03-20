@@ -93,6 +93,9 @@ export function VerificationReports() {
   const mismatches = verifications.filter(v => v.status === 'mismatched');
   const matches = verifications.filter(v => v.status === 'matched');
 
+  const totalValueCost = verifications.reduce((sum, v) => sum + (v.actual_stock * (v.cost || 0)), 0);
+  const totalValueRetail = verifications.reduce((sum, v) => sum + (v.actual_stock * (v.price || 0)), 0);
+
   return (
     <div className="max-w-5xl mx-auto">
       <div className="flex justify-between items-center mb-6">
@@ -117,7 +120,7 @@ export function VerificationReports() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
         <div 
           onClick={() => setFilter('all')}
           className={`cursor-pointer bg-white p-6 rounded-2xl shadow-sm border transition-all ${filter === 'all' ? 'border-stone-800 ring-2 ring-stone-800 ring-offset-2' : 'border-stone-200 hover:border-stone-300'}`}
@@ -142,6 +145,17 @@ export function VerificationReports() {
             <AlertTriangle className="w-4 h-4" /> Mismatched
           </div>
           <div className="text-4xl font-bold text-red-700">{mismatches.length}</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="bg-sky-50 p-6 rounded-2xl shadow-sm border border-sky-100">
+          <div className="text-sky-600 text-sm font-medium uppercase tracking-wider mb-2">Total Verified Cost</div>
+          <div className="text-4xl font-bold text-sky-700">${totalValueCost.toFixed(2)}</div>
+        </div>
+        <div className="bg-blue-50 p-6 rounded-2xl shadow-sm border border-blue-100">
+          <div className="text-blue-600 text-sm font-medium uppercase tracking-wider mb-2">Total Verified Retail Value</div>
+          <div className="text-4xl font-bold text-blue-700">${totalValueRetail.toFixed(2)}</div>
         </div>
       </div>
 
@@ -316,6 +330,8 @@ export function VerificationReports() {
                 <tr className="bg-stone-50 border-b border-stone-200">
                   <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider">Report Date</th>
                   <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">Total Scanned</th>
+                  <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">Cost Value</th>
+                  <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">Retail Value</th>
                   <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">Matched</th>
                   <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">Mismatched</th>
                 </tr>
@@ -337,6 +353,8 @@ export function VerificationReports() {
                           </div>
                         </td>
                         <td className="p-4 text-right font-bold text-stone-700">{report.total_scanned} Items</td>
+                        <td className="p-4 text-right font-bold text-sky-700">${report.total_value_cost != null ? report.total_value_cost.toFixed(2) : '0.00'}</td>
+                        <td className="p-4 text-right font-bold text-blue-700">${report.total_value_retail != null ? report.total_value_retail.toFixed(2) : '0.00'}</td>
                         <td className="p-4 text-right font-bold text-emerald-600">
                           {report.total_matched} 
                           <span className="text-xs font-normal text-emerald-600/70 block">{report.total_scanned > 0 ? Math.round((report.total_matched/report.total_scanned)*100) : 0}% accuracy</span>
@@ -347,7 +365,7 @@ export function VerificationReports() {
                       </tr>
                       {isExpanded && (
                         <tr>
-                          <td colSpan={4} className="bg-stone-50 p-0 border-b border-stone-200">
+                          <td colSpan={6} className="bg-stone-50 p-0 border-b border-stone-200">
                             <div className="p-6 border-t border-stone-200 shadow-inner">
                               <h4 className="font-bold text-stone-800 mb-4">Report Details</h4>
                               {expandedLoading ? (

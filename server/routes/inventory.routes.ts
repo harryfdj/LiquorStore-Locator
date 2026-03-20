@@ -228,13 +228,14 @@ router.post('/upload', upload.single('file'), (req, res) => {
     .on('end', () => {
       try {
         const insertOrUpdate = req.db!.prepare(`
-          INSERT INTO products (sku, name, size, pack, price, stock, location, image_url, category, mainupc, depname, alt_upcs)
-          VALUES (@sku, @name, @size, @pack, @price, @stock, COALESCE((SELECT location FROM products WHERE sku = @sku), ''), COALESCE((SELECT image_url FROM products WHERE sku = @sku), ''), @category, @mainupc, @depname, '')
+          INSERT INTO products (sku, name, size, pack, price, cost, stock, location, image_url, category, mainupc, depname, alt_upcs)
+          VALUES (@sku, @name, @size, @pack, @price, @cost, @stock, COALESCE((SELECT location FROM products WHERE sku = @sku), ''), COALESCE((SELECT image_url FROM products WHERE sku = @sku), ''), @category, @mainupc, @depname, '')
           ON CONFLICT(sku) DO UPDATE SET
             name = excluded.name,
             size = excluded.size,
             pack = excluded.pack,
             price = excluded.price,
+            cost = excluded.cost,
             stock = excluded.stock,
             category = excluded.category,
             mainupc = CASE WHEN products.mainupc = '' THEN excluded.mainupc ELSE products.mainupc END,
@@ -267,6 +268,7 @@ router.post('/upload', upload.single('file'), (req, res) => {
             const size = getValue(item, 'size', ['SizeName']) || '';
             const pack = getValue(item, 'pack', ['PackName']) || '';
             const priceVal = getValue(item, 'price', ['priceperunit', 'ItemPrice']);
+            const costVal = getValue(item, 'cost', ['cost', 'Cost', 'UnitCost', 'itemcost', 'ItemCost']);
             const stockVal = getValue(item, 'stock', ['totalqty', 'TOTALQTY_MULTI']);
             const category = getValue(item, 'category', ['catname', 'ItemTypeDesc']) || '';
             const mainupc = getValue(item, 'mainupc', ['mainupc']) || '';
@@ -278,6 +280,7 @@ router.post('/upload', upload.single('file'), (req, res) => {
               size: size,
               pack: pack,
               price: parseFloat(priceVal) || 0,
+              cost: parseFloat(costVal) || 0,
               stock: parseInt(stockVal) || 0,
               category: category,
               mainupc: mainupc,

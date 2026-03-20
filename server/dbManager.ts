@@ -49,12 +49,16 @@ export function getStoreDb(storeId: number): Database.Database {
       category TEXT,
       mainupc TEXT,
       depname TEXT,
-      alt_upcs TEXT DEFAULT ''
+      alt_upcs TEXT DEFAULT '',
+      cost REAL
     )
   `);
 
   try {
     db.exec(`ALTER TABLE products ADD COLUMN alt_upcs TEXT DEFAULT ''`);
+  } catch (e) {}
+  try {
+    db.exec(`ALTER TABLE products ADD COLUMN cost REAL`);
   } catch (e) {}
 
   db.exec(`
@@ -82,9 +86,16 @@ export function getStoreDb(storeId: number): Database.Database {
       total_scanned INTEGER,
       total_matched INTEGER,
       total_mismatched INTEGER,
+      total_value_cost REAL DEFAULT 0,
+      total_value_retail REAL DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  try {
+    db.exec(`ALTER TABLE weekly_reports ADD COLUMN total_value_cost REAL DEFAULT 0`);
+    db.exec(`ALTER TABLE weekly_reports ADD COLUMN total_value_retail REAL DEFAULT 0`);
+  } catch (e) {}
 
   storeDbs.set(storeId, db);
   return db;

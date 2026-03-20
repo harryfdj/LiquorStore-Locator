@@ -11,6 +11,7 @@ export interface Product {
   mainupc: string;
   depname: string;
   alt_upcs?: string;
+  cost?: number;
   existing_verification?: {
     status: 'matched' | 'mismatched';
     actual_stock: number;
@@ -33,5 +34,7 @@ export interface WeeklyReport {
   total_scanned: number;
   total_matched: number;
   total_mismatched: number;
+  total_value_cost: number;
+  total_value_retail: number;
   created_at: string;
 }

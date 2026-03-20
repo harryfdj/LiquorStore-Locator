@@ -30,6 +30,7 @@ export const CsvMappingModal: React.FC<CsvMappingModalProps> = ({ isOpen, onClos
     { key: 'mainupc', label: 'UPC / Barcode' },
     { key: 'name', label: 'Item Name / Description' },
     { key: 'price', label: 'Retail Price' },
+    { key: 'cost', label: 'Wholesale Cost' },
     { key: 'stock', label: 'Quantity / Stock Level' },
     { key: 'size', label: 'Size (Optional)' },
     { key: 'pack', label: 'Pack (Optional)' },

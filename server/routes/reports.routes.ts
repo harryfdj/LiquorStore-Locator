@@ -13,10 +13,13 @@ router.post('/finalize', (req, res) => {
     const stats = req.db!.prepare(`
       SELECT 
         COUNT(*) as total_scanned,
-        SUM(CASE WHEN status = 'matched' THEN 1 ELSE 0 END) as total_matched,
-        SUM(CASE WHEN status = 'mismatched' THEN 1 ELSE 0 END) as total_mismatched
-      FROM stock_verifications
-      WHERE report_id IS NULL
+        SUM(CASE WHEN sv.status = 'matched' THEN 1 ELSE 0 END) as total_matched,
+        SUM(CASE WHEN sv.status = 'mismatched' THEN 1 ELSE 0 END) as total_mismatched,
+        SUM(sv.actual_stock * p.cost) as total_value_cost,
+        SUM(sv.actual_stock * p.price) as total_value_retail
+      FROM stock_verifications sv
+      LEFT JOIN products p ON sv.sku = p.sku
+      WHERE sv.report_id IS NULL
     `).get() as any;
 
     if (stats.total_scanned === 0) {
@@ -25,10 +28,16 @@ router.post('/finalize', (req, res) => {
 
     // 2. Insert into weekly_reports
     const stmt = req.db!.prepare(`
-      INSERT INTO weekly_reports (total_scanned, total_matched, total_mismatched)
-      VALUES (?, ?, ?)
+      INSERT INTO weekly_reports (total_scanned, total_matched, total_mismatched, total_value_cost, total_value_retail)
+      VALUES (?, ?, ?, ?, ?)
     `);
-    const result = stmt.run(stats.total_scanned, stats.total_matched || 0, stats.total_mismatched || 0);
+    const result = stmt.run(
+      stats.total_scanned, 
+      stats.total_matched || 0, 
+      stats.total_mismatched || 0,
+      stats.total_value_cost || 0,
+      stats.total_value_retail || 0
+    );
     const newReportId = result.lastInsertRowid;
 
     // 3. Link verifications to the new report instead of deleting them
@@ -57,7 +66,7 @@ router.get('/', (req, res) => {
 router.get('/:id/items', (req, res) => {
   try {
     const items = req.db!.prepare(`
-      SELECT sv.*, p.image_url 
+      SELECT sv.*, p.image_url, p.cost, p.price
       FROM stock_verifications sv 
       LEFT JOIN products p ON sv.sku = p.sku 
       WHERE sv.report_id = ? 

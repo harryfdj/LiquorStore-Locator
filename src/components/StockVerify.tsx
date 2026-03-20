@@ -140,7 +140,14 @@ export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
               <div className="flex-1">
                 <h3 className="text-2xl font-bold text-stone-800 mb-2">{product.name}</h3>
                 <div className="text-stone-500 space-y-1 mb-6">
-                  <p className="text-lg text-stone-600 mb-2">Price: <span className="font-bold text-stone-900">${product.price != null ? product.price.toFixed(2) : '0.00'}</span></p>
+                  <div className="flex flex-wrap gap-4 mb-3">
+                    <p className="text-lg text-stone-600 bg-emerald-50 text-emerald-800 px-3 py-1 rounded-lg border border-emerald-100">
+                      Retail: <span className="font-bold">${product.price != null ? product.price.toFixed(2) : '0.00'}</span>
+                    </p>
+                    <p className="text-lg text-stone-600 bg-sky-50 text-sky-800 px-3 py-1 rounded-lg border border-sky-100">
+                      Cost: <span className="font-bold">${product.cost != null ? product.cost.toFixed(2) : '0.00'}</span>
+                    </p>
+                  </div>
                   <p>UPC: <span className="font-mono text-stone-700">{product.mainupc || 'N/A'}</span></p>
                   <p>SKU: <span className="font-mono text-stone-700">{product.sku}</span></p>
                   <p>Location: <span className="font-medium text-stone-700">{product.location || 'None'}</span></p>
