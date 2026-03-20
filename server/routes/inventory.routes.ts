@@ -29,6 +29,12 @@ router.get('/upc/:upc', (req, res) => {
       `).get(upc + '%', '%' + upc + '%') as any;
     }
 
+    // 3. Fallback suffix drop pass (handles extra check digits)
+    if (!product && upc.length > 8) {
+      const choppedUpc = upc.slice(0, -1);
+      product = req.db!.prepare('SELECT * FROM products WHERE mainupc = ? OR sku = ? OR alt_upcs LIKE ?').get(choppedUpc, choppedUpc, '%' + choppedUpc + '%') as any;
+    }
+
     if (product) {
       const existing = req.db!.prepare('SELECT status, actual_stock FROM stock_verifications WHERE sku = ? AND report_id IS NULL').get(product.sku) as any;
       if (existing) {
