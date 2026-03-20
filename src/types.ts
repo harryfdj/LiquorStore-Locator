@@ -27,6 +27,9 @@ export interface Verification {
   actual_stock: number;
   status: 'matched' | 'mismatched';
   created_at: string;
+  image_url?: string;
+  cost?: number;
+  price?: number;
 }
 
 export interface WeeklyReport {

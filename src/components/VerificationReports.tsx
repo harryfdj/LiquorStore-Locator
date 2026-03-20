@@ -184,6 +184,8 @@ export function VerificationReports() {
                     <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-center">Barcode / UPC</th>
                     <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">System Stock</th>
                     <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">Actual Stock</th>
+                    <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">Unit Cost</th>
+                    <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">Total Value</th>
                     <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">Diff</th>
                   </tr>
                 </thead>
@@ -220,6 +222,8 @@ export function VerificationReports() {
                         </td>
                         <td className="p-4 text-right font-medium text-stone-600">{v.system_stock}</td>
                         <td className="p-4 text-right font-bold text-red-600">{v.actual_stock}</td>
+                        <td className="p-4 text-right font-medium text-stone-600">${v.cost?.toFixed(2) || '0.00'}</td>
+                        <td className="p-4 text-right font-bold text-sky-700">${(v.actual_stock * (v.cost || 0)).toFixed(2)}</td>
                         <td className="p-4 text-right font-bold">
                           <span className={`px-2 py-1 rounded-md text-xs ${diff > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                             {diff > 0 ? '+' : ''}{diff}
@@ -260,6 +264,8 @@ export function VerificationReports() {
                     <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-center">Barcode / UPC</th>
                     <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">System Stock</th>
                     <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">Actual Stock</th>
+                    <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">Unit Cost</th>
+                    <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">Total Value</th>
                     <th className="p-4 font-medium text-stone-500 text-sm uppercase tracking-wider text-right">Status</th>
                   </tr>
                 </thead>
@@ -295,6 +301,8 @@ export function VerificationReports() {
                         </td>
                         <td className="p-4 text-right font-medium text-stone-600">{v.system_stock}</td>
                         <td className="p-4 text-right font-bold text-emerald-600">{v.actual_stock}</td>
+                        <td className="p-4 text-right font-medium text-stone-600">${v.cost?.toFixed(2) || '0.00'}</td>
+                        <td className="p-4 text-right font-bold text-sky-700">${(v.actual_stock * (v.cost || 0)).toFixed(2)}</td>
                         <td className="p-4 text-right font-bold">
                           <span className="px-2 py-1 rounded-md text-xs bg-emerald-100 text-emerald-700">Perfect</span>
                         </td>
@@ -388,6 +396,8 @@ export function VerificationReports() {
                                             <th className="px-4 py-3 text-center">Barcode / UPC</th>
                                             <th className="px-4 py-3 text-right">System</th>
                                             <th className="px-4 py-3 text-right">Actual</th>
+                                            <th className="px-4 py-3 text-right">Unit Cost</th>
+                                            <th className="px-4 py-3 text-right">Total Value</th>
                                             <th className="px-4 py-3 text-right">Diff</th>
                                           </tr>
                                         </thead>
@@ -424,6 +434,8 @@ export function VerificationReports() {
                                                 </td>
                                                 <td className="px-4 py-3 text-right text-stone-600 align-middle">{item.system_stock}</td>
                                                 <td className="px-4 py-3 text-right font-bold text-red-600 align-middle">{item.actual_stock}</td>
+                                                <td className="px-4 py-3 text-right text-stone-600 align-middle">${item.cost?.toFixed(2) || '0.00'}</td>
+                                                <td className="px-4 py-3 text-right font-bold text-sky-700 align-middle">${(item.actual_stock * (item.cost || 0)).toFixed(2)}</td>
                                                 <td className="px-4 py-3 text-right font-bold align-middle">
                                                   <span className={`px-2 py-1 rounded-md text-xs ${diff > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                                                     {diff > 0 ? '+' : ''}{diff}
@@ -451,6 +463,8 @@ export function VerificationReports() {
                                             <th className="px-4 py-3 text-center">Barcode / UPC</th>
                                             <th className="px-4 py-3 text-right">System</th>
                                             <th className="px-4 py-3 text-right">Actual</th>
+                                            <th className="px-4 py-3 text-right">Unit Cost</th>
+                                            <th className="px-4 py-3 text-right">Total Value</th>
                                             <th className="px-4 py-3 text-right">Status</th>
                                           </tr>
                                         </thead>
@@ -485,6 +499,8 @@ export function VerificationReports() {
                                               </td>
                                               <td className="px-4 py-3 text-right text-stone-600 align-middle">{item.system_stock}</td>
                                               <td className="px-4 py-3 text-right font-bold text-emerald-600 align-middle">{item.actual_stock}</td>
+                                              <td className="px-4 py-3 text-right text-stone-600 align-middle">${item.cost?.toFixed(2) || '0.00'}</td>
+                                              <td className="px-4 py-3 text-right font-bold text-sky-700 align-middle">${(item.actual_stock * (item.cost || 0)).toFixed(2)}</td>
                                               <td className="px-4 py-3 text-right font-bold align-middle">
                                                 <span className="px-2 py-1 rounded-md text-xs bg-emerald-100 text-emerald-700">Perfect</span>
                                               </td>
