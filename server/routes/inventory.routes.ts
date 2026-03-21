@@ -3,13 +3,14 @@ import multer from 'multer';
 import { parse } from 'csv-parse';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { adminDb } from '../dbManager';
 import { searchImages, scoreImageMatch, downloadImage } from '../services/scraper';
 
 const router = express.Router();
 import { requireAuth } from '../middlewares/auth';
 router.use(requireAuth);
-const upload = multer({ dest: 'uploads/' });
+const upload = multer({ dest: os.tmpdir() });
 
 // Get product by UPC or SKU for verification
 router.get('/upc/:upc', (req, res) => {

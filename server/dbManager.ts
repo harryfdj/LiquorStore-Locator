@@ -75,10 +75,25 @@ export function getStoreDb(storeId: number): Database.Database {
     )
   `);
 
-  db.exec(`
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_stock_verifications_unq 
-    ON stock_verifications(sku, COALESCE(report_id, 0))
-  `);
+  try {
+    // Delete duplicates before creating the unique index 
+    // to prevent server crashes on older databases
+    db.exec(`
+      DELETE FROM stock_verifications
+      WHERE id NOT IN (
+        SELECT MAX(id)
+        FROM stock_verifications
+        GROUP BY sku, COALESCE(report_id, 0)
+      )
+    `);
+    
+    db.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_stock_verifications_unq 
+      ON stock_verifications(sku, COALESCE(report_id, 0))
+    `);
+  } catch (e: any) {
+    console.error(`Warning: Could not create unique index for store ${storeId}:`, e.message);
+  }
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS weekly_reports (
