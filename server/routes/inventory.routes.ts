@@ -17,34 +17,51 @@ router.get('/upc/:upc', (req, res) => {
   try {
     const upc = req.params.upc;
     
+    // Helper to fetch existing verification
+    const attachVerification = (prod: any) => {
+      const existing = req.db!.prepare('SELECT status, actual_stock FROM stock_verifications WHERE sku = ? AND report_id IS NULL').get(prod.sku) as any;
+      if (existing) {
+        prod.existing_verification = existing;
+      }
+      return prod;
+    };
+
     // 1. Exact match pass
-    let product = req.db!.prepare('SELECT * FROM products WHERE mainupc = ? OR sku = ? OR alt_upcs LIKE ?').get(upc, upc, '%' + upc + '%') as any;
-    
-    // 2. Fallback fuzzy prefix match pass (handles dropped check digits)
-    if (!product && upc.length >= 8) {
-      product = req.db!.prepare(`
-        SELECT * FROM products 
-        WHERE mainupc LIKE ? OR alt_upcs LIKE ? 
-        ORDER BY LENGTH(mainupc) ASC 
-        LIMIT 1
-      `).get(upc + '%', '%' + upc + '%') as any;
+    let product = req.db!.prepare('SELECT * FROM products WHERE mainupc = ? OR sku = ? OR alt_upcs LIKE ? LIMIT 1').get(upc, upc, '%' + upc + '%') as any;
+    if (product) return res.json({ type: 'exact', product: attachVerification(product) });
+
+    // 2. Missing Leading Zero exact match pass
+    if (upc.length === 11) {
+      const zeroUpc = '0' + upc;
+      product = req.db!.prepare('SELECT * FROM products WHERE mainupc = ? OR alt_upcs LIKE ? LIMIT 1').get(zeroUpc, '%' + zeroUpc + '%') as any;
+      if (product) return res.json({ type: 'exact', product: attachVerification(product) });
     }
 
     // 3. Fallback suffix drop pass (handles extra check digits)
-    if (!product && upc.length > 8) {
+    if (upc.length > 8) {
       const choppedUpc = upc.slice(0, -1);
-      product = req.db!.prepare('SELECT * FROM products WHERE mainupc = ? OR sku = ? OR alt_upcs LIKE ?').get(choppedUpc, choppedUpc, '%' + choppedUpc + '%') as any;
+      product = req.db!.prepare('SELECT * FROM products WHERE mainupc = ? OR sku = ? OR alt_upcs LIKE ? LIMIT 1').get(choppedUpc, choppedUpc, '%' + choppedUpc + '%') as any;
+      if (product) return res.json({ type: 'exact', product: attachVerification(product) });
     }
 
-    if (product) {
-      const existing = req.db!.prepare('SELECT status, actual_stock FROM stock_verifications WHERE sku = ? AND report_id IS NULL').get(product.sku) as any;
-      if (existing) {
-        product.existing_verification = existing;
+    // 4. Fallback fuzzy search (contains anywhere - handles dropped leading & trailing)
+    if (upc.length >= 6) {
+      const candidates = req.db!.prepare(`
+        SELECT * FROM products 
+        WHERE mainupc LIKE ? OR alt_upcs LIKE ? 
+        ORDER BY LENGTH(mainupc) ASC 
+        LIMIT 10
+      `).all('%' + upc + '%', '%' + upc + '%') as any[];
+
+      if (candidates.length === 1) {
+        return res.json({ type: 'exact', product: attachVerification(candidates[0]) });
+      } else if (candidates.length > 1) {
+        const verifiedCandidates = candidates.map(c => attachVerification(c));
+        return res.json({ type: 'multiple', products: verifiedCandidates });
       }
-      res.json(product);
-    } else {
-      res.status(404).json({ error: 'Product not found' });
     }
+
+    res.status(404).json({ error: 'Product not found' });
   } catch (error) {
     console.error('Error fetching product by UPC:', error);
     res.status(500).json({ error: 'Failed to fetch product' });

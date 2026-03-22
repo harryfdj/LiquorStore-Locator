@@ -10,6 +10,7 @@ interface StockVerifyProps {
 
 export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
   const [product, setProduct] = useState<Product | null>(null);
+  const [candidates, setCandidates] = useState<Product[]>([]);
   const [error, setError] = useState('');
   const [actualStock, setActualStock] = useState<number | ''>('');
   const [isMismatched, setIsMismatched] = useState(false);
@@ -19,12 +20,14 @@ export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
   const fetchProductByUpc = async (searchUpc: string) => {
     if (!searchUpc.trim()) {
       setProduct(null);
+      setCandidates([]);
       setError('');
       return;
     }
 
     setError('');
     setProduct(null);
+    setCandidates([]);
     setIsMismatched(false);
     setIsOverriding(false);
     setActualStock('');
@@ -34,7 +37,11 @@ export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
       const res = await fetch(`/api/products/upc/${encodeURIComponent(searchUpc.trim())}`);
       if (res.ok) {
         const data = await res.json();
-        setProduct(data);
+        if (data.type === 'exact') {
+          setProduct(data.product);
+        } else if (data.type === 'multiple') {
+          setCandidates(data.products);
+        }
       } else {
         setError('Product not found in system.');
       }
@@ -49,6 +56,7 @@ export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
         fetchProductByUpc(searchQuery);
       } else {
         setProduct(null);
+        setCandidates([]);
         setError('');
       }
     }, 500);
@@ -75,6 +83,7 @@ export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
       if (res.ok) {
         setSuccessMessage(`Verified: ${product.name}`);
         setProduct(null);
+        setCandidates([]);
         setSearchQuery('');
         setIsMismatched(false);
         setActualStock('');
@@ -124,6 +133,48 @@ export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
           </div>
         )}
       </div>
+
+      {candidates.length > 0 && !product && (
+        <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden mb-6">
+          <div className="p-6 border-b border-stone-100 bg-amber-50">
+             <div className="flex items-center gap-3 text-amber-800">
+               <AlertCircle className="w-6 h-6" />
+               <h3 className="text-xl font-bold">Multiple Matches Found</h3>
+             </div>
+             <p className="text-amber-700 mt-2">The scanned barcode partially matched multiple items. Please select the correct one:</p>
+          </div>
+          <div className="divide-y divide-stone-100">
+            {candidates.map(candidate => (
+              <div key={candidate.sku} className="p-4 flex items-center gap-4 hover:bg-stone-50 transition-colors">
+                 {candidate.image_url ? (
+                   <img src={candidate.image_url} alt={candidate.name} className="w-16 h-16 object-contain rounded-lg bg-white border border-stone-100 p-1" />
+                 ) : (
+                   <div className="w-16 h-16 bg-stone-100 rounded-lg border border-stone-200 flex items-center justify-center">
+                     <span className="text-stone-400 text-xs">No Img</span>
+                   </div>
+                 )}
+                 <div className="flex-1">
+                    <h4 className="font-bold text-stone-800">{candidate.name}</h4>
+                    <div className="text-sm text-stone-500 mt-1 flex gap-4">
+                       <p>UPC: <span className="font-mono text-stone-700">{candidate.mainupc || 'N/A'}</span></p>
+                       <p>SKU: <span className="font-mono text-stone-700">{candidate.sku}</span></p>
+                    </div>
+                    <p className="text-emerald-700 font-bold mt-1">${candidate.price != null ? candidate.price.toFixed(2) : '0.00'}</p>
+                 </div>
+                 <button 
+                   onClick={() => {
+                     setProduct(candidate);
+                     setCandidates([]);
+                   }}
+                   className="px-6 py-2 bg-stone-800 text-white rounded-xl font-bold hover:bg-stone-900 transition-colors"
+                 >
+                   Select
+                 </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {product && (
         <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
