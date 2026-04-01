@@ -198,9 +198,9 @@ export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
                     <p className="text-lg text-stone-600 bg-sky-50 text-sky-800 px-3 py-1 rounded-lg border border-sky-100">
                       Cost: <span className="font-bold">${product.cost != null ? product.cost.toFixed(2) : '0.00'}</span>
                     </p>
-                    {product.price != null && product.cost != null && product.price > 0 && (
+                    {product.price != null && product.cost != null && product.cost > 0 && (
                       <p className="text-lg text-stone-600 bg-purple-50 text-purple-800 px-3 py-1 rounded-lg border border-purple-100">
-                        Margin: <span className="font-bold">{(((product.price - product.cost) / product.price) * 100).toFixed(2)}%</span>
+                        Margin: <span className="font-bold">{(((product.price - product.cost) / product.cost) * 100).toFixed(2)}%</span>
                       </p>
                     )}
                   </div>
