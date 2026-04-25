@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, X, Save, AlertCircle } from 'lucide-react';
+import { apiJson } from '../lib/api';
+import { StoreSummary } from '../types';
 
 interface CsvMappingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  store: any;
-  token: string;
-  onSuccess: (updatedStore: any) => void;
+  store: StoreSummary | null;
+  onSuccess: (updatedStore: StoreSummary) => void;
 }
 
-export const CsvMappingModal: React.FC<CsvMappingModalProps> = ({ isOpen, onClose, store, token, onSuccess }) => {
+export const CsvMappingModal: React.FC<CsvMappingModalProps> = ({ isOpen, onClose, store, onSuccess }) => {
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -50,24 +51,15 @@ export const CsvMappingModal: React.FC<CsvMappingModalProps> = ({ isOpen, onClos
     }
 
     try {
-      const res = await fetch(`/api/admin/stores/${store.id}/mapping`, {
+      const updatedStore = await apiJson<StoreSummary>(`/api/admin/stores/${store.id}/mapping`, {
         method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
         body: JSON.stringify({ mapping: cleanedMapping })
       });
-      
-      if (res.ok) {
-        onSuccess({ ...store, csv_mapping: cleanedMapping });
-        onClose();
-      } else {
-        const data = await res.json();
-        setError(data.error || 'Failed to save mapping');
-      }
+
+      onSuccess(updatedStore);
+      onClose();
     } catch (e) {
-      setError('Network error saving mapping');
+      setError(e instanceof Error ? e.message : 'Network error saving mapping');
     } finally {
       setLoading(false);
     }

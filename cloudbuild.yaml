@@ -1,0 +1,23 @@
+steps:
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -ceux
+      - |
+        gcloud compute ssh hirak_fdj@liquor-store \
+          --project="${PROJECT_ID}" \
+          --zone="us-central1-f" \
+          --quiet \
+          --command='
+            set -euo pipefail
+            cd /home/hirak_fdj/LiquorStore-Locator
+            git fetch origin main
+            git reset --hard origin/main
+            npm ci
+            npm run build
+            PM2_HOME=/home/hirak_fdj/.pm2 pm2 restart liquor-store --update-env
+            PM2_HOME=/home/hirak_fdj/.pm2 pm2 save
+          '
+
+options:
+  logging: CLOUD_LOGGING_ONLY

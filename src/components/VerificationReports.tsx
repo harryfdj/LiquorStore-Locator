@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { FileText, AlertTriangle, CheckCircle, Trash2, Archive, CalendarDays, BarChart2, ChevronDown, ChevronUp } from 'lucide-react';
 import Barcode from 'react-barcode';
 import { Verification, WeeklyReport } from '../types';
+import { apiFetch, apiJson } from '../lib/api';
+import { proxyUrl } from './InventoryTab';
 
 export function VerificationReports() {
   const [verifications, setVerifications] = useState<Verification[]>([]);
   const [pastReports, setPastReports] = useState<WeeklyReport[]>([]);
-  const [expandedReportId, setExpandedReportId] = useState<number | null>(null);
+  const [expandedReportId, setExpandedReportId] = useState<string | null>(null);
   const [expandedItems, setExpandedItems] = useState<Verification[]>([]);
   const [expandedLoading, setExpandedLoading] = useState(false);
   const [filter, setFilter] = useState<'all' | 'matched' | 'mismatched'>('all');
@@ -15,13 +17,7 @@ export function VerificationReports() {
 
   const fetchVerifications = async () => {
     try {
-      const res = await fetch('/api/verifications');
-      if (res.ok) {
-        const data = await res.json();
-        setVerifications(data);
-      } else {
-        setError('Failed to fetch verifications.');
-      }
+      setVerifications(await apiJson<Verification[]>('/api/verifications'));
     } catch (err) {
       setError('Failed to fetch verifications.');
     } finally {
@@ -31,17 +27,13 @@ export function VerificationReports() {
 
   const fetchPastReports = async () => {
     try {
-      const res = await fetch('/api/reports');
-      if (res.ok) {
-        const data = await res.json();
-        setPastReports(data);
-      }
+      setPastReports(await apiJson<WeeklyReport[]>('/api/reports'));
     } catch (err) {
       console.error('Failed to fetch past reports', err);
     }
   };
 
-  const handleExpandReport = async (reportId: number) => {
+  const handleExpandReport = async (reportId: string) => {
     if (expandedReportId === reportId) {
       setExpandedReportId(null);
       setExpandedItems([]);
@@ -51,11 +43,7 @@ export function VerificationReports() {
     setExpandedReportId(reportId);
     setExpandedLoading(true);
     try {
-      const res = await fetch(`/api/reports/${reportId}/items`);
-      if (res.ok) {
-        const items = await res.json();
-        setExpandedItems(items);
-      }
+      setExpandedItems(await apiJson<Verification[]>(`/api/reports/${reportId}/items`));
     } catch (err) {
       console.error('Failed to fetch report items', err);
     } finally {
@@ -76,13 +64,9 @@ export function VerificationReports() {
     if (!window.confirm('Are you sure you want to finalize this week\'s report? This will save your current progress to the Past Reports and clear the list for next week. This action cannot be undone.')) return;
     
     try {
-      const res = await fetch('/api/reports/finalize', { method: 'POST' });
-      if (res.ok) {
-        setVerifications([]);
-        fetchPastReports(); // Refresh past reports
-      } else {
-        setError('Failed to finalize report.');
-      }
+      await apiFetch('/api/reports/finalize', { method: 'POST' });
+      setVerifications([]);
+      fetchPastReports(); // Refresh past reports
     } catch (err) {
       setError('Failed to finalize report.');
     }
@@ -202,7 +186,7 @@ export function VerificationReports() {
                           <div className="flex items-center gap-4">
                             <div className="w-12 h-16 bg-white rounded-lg border border-stone-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
                               {v.image_url ? (
-                                <img src={v.image_url} alt={v.name} className="w-full h-full object-contain mix-blend-multiply" loading="lazy" />
+                                <img src={proxyUrl(v.image_url)} alt={v.name} className="w-full h-full object-contain mix-blend-multiply" loading="lazy" />
                               ) : (
                                 <FileText className="w-6 h-6 text-stone-300" />
                               )}
@@ -414,7 +398,7 @@ export function VerificationReports() {
                                                   <div className="flex items-center gap-3">
                                                     <div className="w-8 h-10 bg-white rounded border border-stone-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
                                                       {item.image_url ? (
-                                                        <img src={item.image_url} alt={item.name} className="w-full h-full object-contain mix-blend-multiply" loading="lazy" />
+                                                        <img src={proxyUrl(item.image_url)} alt={item.name} className="w-full h-full object-contain mix-blend-multiply" loading="lazy" />
                                                       ) : (
                                                         <FileText className="w-4 h-4 text-stone-300" />
                                                       )}
@@ -479,7 +463,7 @@ export function VerificationReports() {
                                                 <div className="flex items-center gap-3">
                                                   <div className="w-8 h-10 bg-white rounded border border-stone-200 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
                                                     {item.image_url ? (
-                                                      <img src={item.image_url} alt={item.name} className="w-full h-full object-contain mix-blend-multiply" loading="lazy" />
+                                                      <img src={proxyUrl(item.image_url)} alt={item.name} className="w-full h-full object-contain mix-blend-multiply" loading="lazy" />
                                                     ) : (
                                                       <FileText className="w-4 h-4 text-stone-300" />
                                                     )}

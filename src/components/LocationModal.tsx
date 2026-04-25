@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, X, Save, AlertCircle } from 'lucide-react';
+import { apiJson } from '../lib/api';
+import { StoreSummary } from '../types';
 
 interface LocationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  store: any;
-  token: string;
-  onSuccess: (updatedStore: any) => void;
+  store: StoreSummary | null;
+  onSuccess: (updatedStore: StoreSummary) => void;
 }
 
-export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose, store, token, onSuccess }) => {
+export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose, store, onSuccess }) => {
   const [lat, setLat] = useState<string>('');
   const [lng, setLng] = useState<string>('');
   const [radiusMiles, setRadiusMiles] = useState<string>('');
@@ -46,24 +47,15 @@ export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose, s
     }
 
     try {
-      const res = await fetch(`/api/admin/stores/${store.id}/location`, {
+      const updatedStore = await apiJson<StoreSummary>(`/api/admin/stores/${store.id}/location`, {
         method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
         body: JSON.stringify({ lat: parsedLat, lng: parsedLng, radius_miles: parsedRadius })
       });
-      
-      if (res.ok) {
-        onSuccess({ ...store, lat: parsedLat, lng: parsedLng, radius_miles: parsedRadius });
-        onClose();
-      } else {
-        const data = await res.json();
-        setError(data.error || 'Failed to save location');
-      }
+
+      onSuccess(updatedStore);
+      onClose();
     } catch (e) {
-      setError('Network error saving location');
+      setError(e instanceof Error ? e.message : 'Network error saving location');
     } finally {
       setLoading(false);
     }

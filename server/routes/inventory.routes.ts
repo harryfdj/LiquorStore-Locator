@@ -2,130 +2,166 @@ import express from 'express';
 import multer from 'multer';
 import { parse } from 'csv-parse';
 import fs from 'fs';
-import path from 'path';
 import os from 'os';
-import { adminDb } from '../dbManager';
-import { searchImages, scoreImageMatch, downloadImage } from '../services/scraper';
+import { requireAuth } from '../middlewares/auth';
+import { requireStoreId, sendError } from '../lib/http';
+import { mapProduct, parseAltUpcs, ProductRow, supabaseAdmin } from '../lib/supabase';
+import { updateProductSchema } from '../lib/schemas';
+import { downloadImageToStorage, searchImages, scoreImageMatch } from '../services/scraper';
 
 const router = express.Router();
-import { requireAuth } from '../middlewares/auth';
 router.use(requireAuth);
 const upload = multer({ dest: os.tmpdir() });
 
+function normalizeCode(value: string) {
+  return value.trim();
+}
+
+async function productsForStore(storeId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('products')
+    .select('*')
+    .eq('store_id', storeId);
+
+  if (error) throw error;
+  return (data || []) as ProductRow[];
+}
+
+function withExistingVerification(product: ProductRow, verifications: Map<string, any>) {
+  const mapped: ReturnType<typeof mapProduct> & { existing_verification?: any } = mapProduct(product);
+  const existing = verifications.get(product.sku);
+  if (existing) mapped.existing_verification = existing;
+  return mapped;
+}
+
+async function activeVerificationsBySku(storeId: string, skus: string[]) {
+  if (skus.length === 0) return new Map<string, any>();
+  const { data, error } = await supabaseAdmin
+    .from('stock_verifications')
+    .select('sku,status,actual_stock')
+    .eq('store_id', storeId)
+    .is('report_id', null)
+    .in('sku', skus);
+
+  if (error) throw error;
+  return new Map((data || []).map(row => [row.sku, { status: row.status, actual_stock: row.actual_stock }]));
+}
+
 // Get product by UPC or SKU for verification
-router.get('/upc/:upc', (req, res) => {
+router.get('/upc/:upc', async (req, res) => {
   try {
-    const upc = req.params.upc;
-    
-    // Helper to fetch existing verification
-    const attachVerification = (prod: any) => {
-      const existing = req.db!.prepare('SELECT status, actual_stock FROM stock_verifications WHERE sku = ? AND report_id IS NULL').get(prod.sku) as any;
-      if (existing) {
-        prod.existing_verification = existing;
-      }
-      return prod;
-    };
+    const storeId = requireStoreId(req);
+    const upc = normalizeCode(req.params.upc);
+    const variants = new Set([upc]);
+    if (upc.length === 11) variants.add(`0${upc}`);
+    if (upc.length > 8) variants.add(upc.slice(0, -1));
 
-    // 1. Exact match pass
-    let product = req.db!.prepare('SELECT * FROM products WHERE mainupc = ? OR sku = ? OR alt_upcs LIKE ? LIMIT 1').get(upc, upc, '%' + upc + '%') as any;
-    if (product) return res.json({ type: 'exact', product: attachVerification(product) });
+    const products = await productsForStore(storeId);
+    const exact = products.find(product => {
+      const codes = [product.sku, product.mainupc, ...(product.alt_upcs || [])].filter(Boolean);
+      return codes.some(code => variants.has(code));
+    });
 
-    // 2. Missing Leading Zero exact match pass
-    if (upc.length === 11) {
-      const zeroUpc = '0' + upc;
-      product = req.db!.prepare('SELECT * FROM products WHERE mainupc = ? OR alt_upcs LIKE ? LIMIT 1').get(zeroUpc, '%' + zeroUpc + '%') as any;
-      if (product) return res.json({ type: 'exact', product: attachVerification(product) });
+    if (exact) {
+      const existing = await activeVerificationsBySku(storeId, [exact.sku]);
+      return res.json({ type: 'exact', product: withExistingVerification(exact, existing) });
     }
 
-    // 3. Fallback suffix drop pass (handles extra check digits)
-    if (upc.length > 8) {
-      const choppedUpc = upc.slice(0, -1);
-      product = req.db!.prepare('SELECT * FROM products WHERE mainupc = ? OR sku = ? OR alt_upcs LIKE ? LIMIT 1').get(choppedUpc, choppedUpc, '%' + choppedUpc + '%') as any;
-      if (product) return res.json({ type: 'exact', product: attachVerification(product) });
-    }
-
-    // 4. Fallback fuzzy search (contains anywhere - handles dropped leading & trailing)
     if (upc.length >= 6) {
-      const candidates = req.db!.prepare(`
-        SELECT * FROM products 
-        WHERE mainupc LIKE ? OR alt_upcs LIKE ? 
-        ORDER BY LENGTH(mainupc) ASC 
-        LIMIT 10
-      `).all('%' + upc + '%', '%' + upc + '%') as any[];
+      const candidates = products
+        .filter(product => {
+          const codes = [product.mainupc, ...(product.alt_upcs || [])].filter(Boolean);
+          return codes.some(code => code.includes(upc) || upc.includes(code));
+        })
+        .slice(0, 10);
 
       if (candidates.length === 1) {
-        return res.json({ type: 'exact', product: attachVerification(candidates[0]) });
-      } else if (candidates.length > 1) {
-        const verifiedCandidates = candidates.map(c => attachVerification(c));
-        return res.json({ type: 'multiple', products: verifiedCandidates });
+        const existing = await activeVerificationsBySku(storeId, [candidates[0].sku]);
+        return res.json({ type: 'exact', product: withExistingVerification(candidates[0], existing) });
+      }
+
+      if (candidates.length > 1) {
+        const existing = await activeVerificationsBySku(storeId, candidates.map(candidate => candidate.sku));
+        return res.json({ type: 'multiple', products: candidates.map(candidate => withExistingVerification(candidate, existing)) });
       }
     }
 
-    res.status(404).json({ error: 'Product not found' });
+    return res.status(404).json({ error: 'Product not found' });
   } catch (error) {
-    console.error('Error fetching product by UPC:', error);
-    res.status(500).json({ error: 'Failed to fetch product' });
+    return sendError(res, error, 'Failed to fetch product');
   }
 });
 
 // Get all products (with optional search)
-router.get('/', (req, res) => {
-  const search = req.query.q as string;
-  const department = req.query.dept as string;
-  let query = 'SELECT * FROM products WHERE 1=1';
-  let params: any[] = [];
-
-  if (search) {
-    query += ' AND (name LIKE ? OR sku LIKE ? OR location LIKE ? OR mainupc LIKE ? OR alt_upcs LIKE ?)';
-    const searchTerm = `%${search}%`;
-    params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
-  }
-
-  if (department) {
-    query += ' AND depname = ?';
-    params.push(department);
-  }
-
-  query += ' ORDER BY name ASC';
-
+router.get('/', async (req, res) => {
   try {
-    const stmt = req.db!.prepare(query);
-    const products = stmt.all(...params);
-    res.json(products);
+    const storeId = requireStoreId(req);
+    const search = String(req.query.q || '').trim();
+    const department = String(req.query.dept || '').trim();
+
+    let query = supabaseAdmin
+      .from('products')
+      .select('*')
+      .eq('store_id', storeId)
+      .order('name', { ascending: true });
+
+    if (department) query = query.eq('depname', department);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const products = ((data || []) as ProductRow[])
+      .filter(product => {
+        if (!search) return true;
+        const haystack = [
+          product.name,
+          product.sku,
+          product.location,
+          product.mainupc,
+          ...(product.alt_upcs || []),
+        ].join(' ').toLowerCase();
+        return haystack.includes(search.toLowerCase());
+      })
+      .map(mapProduct);
+
+    return res.json(products);
   } catch (error) {
-    console.error('Error fetching products:', error);
-    res.status(500).json({ error: 'Failed to fetch products' });
+    return sendError(res, error, 'Failed to fetch products');
   }
 });
 
 // Update a product's location, image, or upcs
 router.put('/:sku', async (req, res) => {
   const { sku } = req.params;
-  const { location, alt_upcs } = req.body;
-  let { image_url } = req.body;
 
   try {
+    const storeId = requireStoreId(req);
+    const body = updateProductSchema.parse(req.body);
+    let image_url = body.image_url;
+
     if (image_url && image_url.startsWith('http')) {
       try {
-        const storeId = (req.user as any).storeId;
-        image_url = await downloadImage(image_url, sku, storeId);
+        image_url = await downloadImageToStorage(image_url, sku, storeId);
       } catch (downloadErr: any) {
         console.error(`Failed to download manually selected image for ${sku}:`, downloadErr.message);
       }
     }
 
-    const stmt = req.db!.prepare(`
-      UPDATE products 
-      SET location = COALESCE(?, location), 
-          image_url = COALESCE(?, image_url),
-          alt_upcs = COALESCE(?, alt_upcs)
-      WHERE sku = ?
-    `);
-    stmt.run(location, image_url, alt_upcs !== undefined ? alt_upcs : null, sku);
-    res.json({ success: true, image_url });
+    const update: Record<string, unknown> = {};
+    if (body.location !== undefined) update.location = body.location;
+    if (image_url !== undefined) update.image_url = image_url;
+    if (body.alt_upcs !== undefined) update.alt_upcs = parseAltUpcs(body.alt_upcs);
+
+    const { error } = await supabaseAdmin
+      .from('products')
+      .update(update)
+      .eq('store_id', storeId)
+      .eq('sku', sku);
+
+    if (error) throw error;
+    return res.json({ success: true, image_url });
   } catch (error) {
-    console.error('Error updating product:', error);
-    res.status(500).json({ error: 'Failed to update product' });
+    return sendError(res, error, 'Failed to update product');
   }
 });
 
@@ -133,9 +169,15 @@ router.put('/:sku', async (req, res) => {
 router.post('/:sku/fetch-image', async (req, res) => {
   const { sku } = req.params;
   try {
-    const product = req.db!.prepare('SELECT name, size FROM products WHERE sku = ?').get(sku) as any;
+    const storeId = requireStoreId(req);
+    const { data: product, error } = await supabaseAdmin
+      .from('products')
+      .select('*')
+      .eq('store_id', storeId)
+      .eq('sku', sku)
+      .single();
 
-    if (!product) {
+    if (error || !product) {
       return res.status(404).json({ error: 'Product not found' });
     }
 
@@ -178,21 +220,24 @@ router.post('/:sku/fetch-image', async (req, res) => {
     if (bestImage) {
       let finalImageUrl = bestImage;
       try {
-        const storeId = (req.user as any).storeId;
-        finalImageUrl = await downloadImage(bestImage, sku, storeId);
+        finalImageUrl = await downloadImageToStorage(bestImage, sku, storeId);
       } catch (downloadErr: any) {
         console.error(`Failed to download image for ${sku}, falling back to external URL.`, downloadErr.message);
       }
 
-      const stmt = req.db!.prepare('UPDATE products SET image_url = ? WHERE sku = ?');
-      stmt.run(finalImageUrl, sku);
+      const { error: updateError } = await supabaseAdmin
+        .from('products')
+        .update({ image_url: finalImageUrl })
+        .eq('store_id', storeId)
+        .eq('sku', sku);
+
+      if (updateError) throw updateError;
       return res.json({ success: true, image_url: finalImageUrl });
     } else {
       return res.json({ success: false, no_image: true });
     }
   } catch (error) {
-    console.error(`Error fetching image for SKU ${sku}:`, error);
-    res.status(500).json({ error: 'Failed to fetch image' });
+    return sendError(res, error, 'Failed to fetch image');
   }
 });
 
@@ -200,10 +245,15 @@ router.post('/:sku/fetch-image', async (req, res) => {
 router.get('/:sku/image-candidates', async (req, res) => {
   const { sku } = req.params;
   try {
-    const stmt = req.db!.prepare('SELECT name FROM products WHERE sku = ?');
-    const product = stmt.get(sku) as any;
+    const storeId = requireStoreId(req);
+    const { data: product, error } = await supabaseAdmin
+      .from('products')
+      .select('name')
+      .eq('store_id', storeId)
+      .eq('sku', sku)
+      .single();
 
-    if (!product) {
+    if (error || !product) {
       return res.status(404).json({ error: 'Product not found' });
     }
 
@@ -232,30 +282,19 @@ router.get('/:sku/image-candidates', async (req, res) => {
       return res.json({ success: true, candidates: [] });
     }
   } catch (error) {
-    console.error(`Error fetching image candidates for SKU ${sku}:`, error);
-    res.status(500).json({ error: 'Failed to fetch image candidates' });
+    return sendError(res, error, 'Failed to fetch image candidates');
   }
 });
 
 
 // Upload CSV and sync inventory
-router.post('/upload', upload.single('file'), (req, res) => {
+router.post('/upload', upload.single('file'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded' });
   }
 
-  const storeId = (req.user as any)?.storeId;
-  let customMapping: any = {};
-  if (storeId) {
-    try {
-      const storeRow = adminDb.prepare('SELECT csv_mapping FROM stores WHERE id = ?').get(storeId) as any;
-      if (storeRow && storeRow.csv_mapping) {
-        customMapping = JSON.parse(storeRow.csv_mapping);
-      }
-    } catch (e) {
-      console.error('Error fetching custom mapping:', e);
-    }
-  }
+  const storeId = requireStoreId(req);
+  const customMapping = req.user?.store?.csv_mapping || {};
 
   const results: any[] = [];
 
@@ -263,28 +302,8 @@ router.post('/upload', upload.single('file'), (req, res) => {
     .pipe(parse({ columns: true, skip_empty_lines: true, bom: true, trim: true, relax_quotes: true, relax_column_count: true }))
     .on('data', (data) => results.push(data))
     .on('end', () => {
+      (async () => {
       try {
-        const insertOrUpdate = req.db!.prepare(`
-          INSERT INTO products (sku, name, size, pack, price, cost, stock, location, image_url, category, mainupc, depname, alt_upcs)
-          VALUES (@sku, @name, @size, @pack, @price, @cost, @stock, COALESCE((SELECT location FROM products WHERE sku = @sku), ''), COALESCE((SELECT image_url FROM products WHERE sku = @sku), ''), @category, @mainupc, @depname, '')
-          ON CONFLICT(sku) DO UPDATE SET
-            name = excluded.name,
-            size = excluded.size,
-            pack = excluded.pack,
-            price = excluded.price,
-            cost = excluded.cost,
-            stock = excluded.stock,
-            category = excluded.category,
-            mainupc = CASE WHEN products.mainupc = '' THEN excluded.mainupc ELSE products.mainupc END,
-            alt_upcs = CASE 
-              WHEN excluded.mainupc != '' AND excluded.mainupc != products.mainupc AND instr(products.alt_upcs, excluded.mainupc) = 0 THEN
-                CASE WHEN products.alt_upcs = '' THEN excluded.mainupc ELSE products.alt_upcs || ',' || excluded.mainupc END
-              ELSE products.alt_upcs
-            END,
-            depname = excluded.depname
-        `);
-
-        // Helper to pull value either from custom mapping key OR fallback
         const getValue = (item: any, mapKey: string, fallbacks: string[]) => {
           if (customMapping[mapKey] && item[customMapping[mapKey]] !== undefined) {
             return item[customMapping[mapKey]];
@@ -295,12 +314,25 @@ router.post('/upload', upload.single('file'), (req, res) => {
           return undefined;
         };
 
-        const transaction = req.db!.transaction((items) => {
-          for (const item of items) {
+        const { data: existingRows, error: existingError } = await supabaseAdmin
+          .from('products')
+          .select('*')
+          .eq('store_id', storeId);
+        if (existingError) throw existingError;
+
+        const existingBySku = new Map(((existingRows || []) as ProductRow[]).map(row => [row.sku, row]));
+
+        const rows: ProductRow[] = [];
+        let skipped = 0;
+
+        for (const item of results) {
             const sku = getValue(item, 'sku', ['sku', 'SKU']);
             const name = getValue(item, 'name', ['description', 'ITEMNAME']);
 
-            if (!sku || !name) continue;
+            if (!sku || !name) {
+              skipped += 1;
+              continue;
+            }
 
             const size = getValue(item, 'size', ['SizeName']) || '';
             const pack = getValue(item, 'pack', ['PackName']) || '';
@@ -310,29 +342,45 @@ router.post('/upload', upload.single('file'), (req, res) => {
             const category = getValue(item, 'category', ['catname', 'ItemTypeDesc']) || '';
             const mainupc = getValue(item, 'mainupc', ['mainupc']) || '';
             const depname = getValue(item, 'depname', ['depname']) || '';
+            const existing = existingBySku.get(String(sku));
+            const altUpcs = existing?.alt_upcs || [];
+            const nextMainUpc = existing?.mainupc || String(mainupc || '');
+            if (mainupc && existing?.mainupc && existing.mainupc !== mainupc && !altUpcs.includes(String(mainupc))) {
+              altUpcs.push(String(mainupc));
+            }
 
-            insertOrUpdate.run({
-              sku: sku,
-              name: name,
-              size: size,
-              pack: pack,
+            rows.push({
+              store_id: storeId,
+              sku: String(sku),
+              name: String(name),
+              size: String(size),
+              pack: String(pack),
               price: parseFloat(priceVal) || 0,
               cost: parseFloat(costVal) || 0,
               stock: parseInt(stockVal) || 0,
-              category: category,
-              mainupc: mainupc,
-              depname: depname
+              location: existing?.location || '',
+              image_url: existing?.image_url || '',
+              category: String(category),
+              mainupc: nextMainUpc,
+              depname: String(depname),
+              alt_upcs: altUpcs,
             });
           }
-        });
 
-        transaction(results);
+        for (let i = 0; i < rows.length; i += 500) {
+          const { error } = await supabaseAdmin
+            .from('products')
+            .upsert(rows.slice(i, i + 500), { onConflict: 'store_id,sku' });
+          if (error) throw error;
+        }
+
         fs.unlinkSync(req.file!.path);
-        res.json({ success: true, count: results.length });
+        return res.json({ success: true, count: rows.length, skipped });
       } catch (error: any) {
         console.error('Database error during CSV import:', error);
-        res.status(500).json({ error: error.message || 'Failed to process CSV data' });
+        return res.status(500).json({ error: error.message || 'Failed to process CSV data' });
       }
+      })();
     })
     .on('error', (error: any) => {
       console.error('CSV Parse Error:', error);

@@ -1,0 +1,28 @@
+---
+description: Keep Obsidian project memory current during coding work
+alwaysApply: true
+---
+
+# Project Memory
+
+This project uses `docs/obsidian` as an Obsidian vault for durable project memory.
+
+Before large changes, read:
+
+- `docs/obsidian/Home.md`
+- `docs/obsidian/Architecture.md`
+- `docs/obsidian/API Map.md`
+- `docs/obsidian/Production Roadmap.md`
+
+When code changes alter architecture, APIs, production setup, or important behavior, update the matching note in `docs/obsidian`.
+
+Use these notes as the memory map:
+
+- `Architecture.md`: stack, entry points, frontend/backend modules, database model.
+- `API Map.md`: routes, auth behavior, request/response expectations.
+- `Production Roadmap.md`: production hardening and rewrite plan.
+- `Feature Backlog.md`: feature ideas and improvements.
+- `Decision Log.md`: durable technical decisions and why they were made.
+- `Session Notes.md`: concise summaries of meaningful work.
+
+Do not store secrets, tokens, passwords, customer data, or local-only credentials in memory notes.

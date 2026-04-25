@@ -1,7 +1,8 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Search, Check, X, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Check, X, AlertCircle } from 'lucide-react';
 import { Product } from '../types';
-import { CameraScanner } from './CameraScanner';
+import { apiFetch, apiJson } from '../lib/api';
+import { proxyUrl } from './InventoryTab';
 
 interface StockVerifyProps {
   searchQuery: string;
@@ -34,19 +35,14 @@ export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
     setSuccessMessage('');
 
     try {
-      const res = await fetch(`/api/products/upc/${encodeURIComponent(searchUpc.trim())}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.type === 'exact') {
-          setProduct(data.product);
-        } else if (data.type === 'multiple') {
-          setCandidates(data.products);
-        }
-      } else {
-        setError('Product not found in system.');
+      const data = await apiJson<{ type: 'exact'; product: Product } | { type: 'multiple'; products: Product[] }>(`/api/products/upc/${encodeURIComponent(searchUpc.trim())}`);
+      if (data.type === 'exact') {
+        setProduct(data.product);
+      } else if (data.type === 'multiple') {
+        setCandidates(data.products);
       }
     } catch (err) {
-      setError('Failed to fetch product.');
+      setError(err instanceof Error ? err.message : 'Product not found in system.');
     }
   };
 
@@ -59,7 +55,7 @@ export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
         setCandidates([]);
         setError('');
       }
-    }, 500);
+    }, 120);
     return () => clearTimeout(debounce);
   }, [searchQuery]);
 
@@ -67,9 +63,8 @@ export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
     if (!product) return;
 
     try {
-      const res = await fetch('/api/verifications', {
+      await apiFetch('/api/verifications', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sku: product.sku,
           mainupc: product.mainupc,
@@ -80,16 +75,12 @@ export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
         })
       });
 
-      if (res.ok) {
-        setSuccessMessage(`Verified: ${product.name}`);
-        setProduct(null);
-        setCandidates([]);
-        setSearchQuery('');
-        setIsMismatched(false);
-        setActualStock('');
-      } else {
-        setError('Failed to save verification.');
-      }
+      setSuccessMessage(`Verified: ${product.name}`);
+      setProduct(null);
+      setCandidates([]);
+      setSearchQuery('');
+      setIsMismatched(false);
+      setActualStock('');
     } catch (err) {
       setError('Failed to save verification.');
     }
@@ -147,7 +138,7 @@ export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
             {candidates.map(candidate => (
               <div key={candidate.sku} className="p-4 flex items-center gap-4 hover:bg-stone-50 transition-colors">
                  {candidate.image_url ? (
-                   <img src={candidate.image_url} alt={candidate.name} className="w-16 h-16 object-contain rounded-lg bg-white border border-stone-100 p-1" />
+                   <img src={proxyUrl(candidate.image_url)} alt={candidate.name} className="w-16 h-16 object-contain rounded-lg bg-white border border-stone-100 p-1" />
                  ) : (
                    <div className="w-16 h-16 bg-stone-100 rounded-lg border border-stone-200 flex items-center justify-center">
                      <span className="text-stone-400 text-xs">No Img</span>
@@ -181,7 +172,7 @@ export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
           <div className="p-6">
             <div className="flex gap-6">
               {product.image_url ? (
-                <img src={product.image_url} alt={product.name} className="w-32 h-32 object-contain rounded-lg bg-stone-50 border border-stone-100 p-2" />
+                <img src={proxyUrl(product.image_url)} alt={product.name} className="w-32 h-32 object-contain rounded-lg bg-stone-50 border border-stone-100 p-2" />
               ) : (
                 <div className="w-32 h-32 bg-stone-50 rounded-lg border border-stone-100 flex items-center justify-center">
                   <span className="text-stone-400 text-sm">No Image</span>

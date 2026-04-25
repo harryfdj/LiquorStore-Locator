@@ -7,13 +7,14 @@ import verificationsRoutes from './server/routes/verifications.routes';
 import proxyRoutes from './server/routes/proxy.routes';
 import authRoutes from './server/routes/auth.routes';
 import adminRoutes from './server/routes/admin.routes';
+import { config } from './server/lib/config';
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = config.PORT;
 
   app.use(express.static('public'));
-  app.use(express.json());
+  app.use(express.json({ limit: '1mb' }));
 
   // Mount API Routes
   app.use('/api/auth', authRoutes);

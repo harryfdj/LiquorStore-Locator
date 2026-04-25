@@ -19,7 +19,7 @@ export interface Product {
 }
 
 export interface Verification {
-  id: number;
+  id: string;
   sku: string;
   mainupc: string;
   name: string;
@@ -33,11 +33,33 @@ export interface Verification {
 }
 
 export interface WeeklyReport {
-  id: number;
+  id: string;
   total_scanned: number;
   total_matched: number;
   total_mismatched: number;
   total_value_cost: number;
   total_value_retail: number;
   created_at: string;
+}
+
+export interface StoreSummary {
+  id: string;
+  name: string;
+  code: string;
+  created_at: string;
+  csv_mapping: Record<string, string>;
+  lat: number | null;
+  lng: number | null;
+  radius_miles: number | null;
+}
+
+export interface AuthUser {
+  role: 'admin' | 'store';
+  token: string;
+  email?: string;
+  storeId?: string;
+  storeName?: string;
+  lat?: number | null;
+  lng?: number | null;
+  radius_miles?: number | null;
 }

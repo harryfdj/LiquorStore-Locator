@@ -1,8 +1,12 @@
 import express from 'express';
 import https from 'https';
 import http from 'http';
+import { requireAuth } from '../middlewares/auth';
 
 const router = express.Router();
+router.use(requireAuth);
+
+const blockedHostPattern = /^(localhost|127\.|10\.|169\.254\.|172\.(1[6-9]|2\d|3[0-1])\.|192\.168\.|0\.0\.0\.0)/i;
 
 // --- IMAGE PROXY (avoids CORS/hotlink blocking in browser) ---
 router.get('/', (req, res) => {
@@ -11,6 +15,10 @@ router.get('/', (req, res) => {
 
   try {
     const parsedUrl = new URL(imageUrl);
+    if (!['http:', 'https:'].includes(parsedUrl.protocol) || blockedHostPattern.test(parsedUrl.hostname)) {
+      return res.status(400).send('URL is not allowed');
+    }
+
     const transport = parsedUrl.protocol === 'https:' ? https : http;
 
     const proxyReq = transport.get(
@@ -20,8 +28,7 @@ router.get('/', (req, res) => {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           'Referer': parsedUrl.origin,
           'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-        },
-        rejectUnauthorized: false
+        }
       },
       (imgRes) => {
         // Follow redirects

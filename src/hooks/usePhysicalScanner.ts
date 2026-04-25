@@ -6,7 +6,8 @@ export function usePhysicalScanner(onScan: (code: string) => void) {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isInput = ['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName);
+      const target = e.target as HTMLElement;
+      const isEditable = ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable;
       const currentTime = Date.now();
       const timeDiff = currentTime - lastKeyTime.current;
 
@@ -20,11 +21,11 @@ export function usePhysicalScanner(onScan: (code: string) => void) {
           onScan(barcodeBuffer.current);
           barcodeBuffer.current = ''; // Clear buffer immediately
           
-          if (!isInput) {
+          if (!isEditable) {
             e.preventDefault();
           }
         }
-      } else if (e.key.length === 1) {
+      } else if (e.key.length === 1 && !isEditable) {
         // Collect standard alphanumeric characters
         barcodeBuffer.current += e.key;
       }

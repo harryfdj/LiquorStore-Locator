@@ -2,54 +2,97 @@ import express from 'express';
 
 const router = express.Router();
 import { requireAuth } from '../middlewares/auth';
+import { requireStoreId, sendError } from '../lib/http';
+import { verificationSchema } from '../lib/schemas';
+import { supabaseAdmin } from '../lib/supabase';
 router.use(requireAuth);
 
 // Save a stock verification
-router.post('/', (req, res) => {
-  const { sku, mainupc, name, system_stock, actual_stock, status } = req.body;
+router.post('/', async (req, res) => {
   try {
-    const stmt = req.db!.prepare(`
-      INSERT INTO stock_verifications (sku, mainupc, name, system_stock, actual_stock, status)
-      VALUES (@sku, @mainupc, @name, @system_stock, @actual_stock, @status)
-      ON CONFLICT(sku, COALESCE(report_id, 0)) DO UPDATE SET
-        system_stock = excluded.system_stock,
-        actual_stock = excluded.actual_stock,
-        status = excluded.status,
-        created_at = CURRENT_TIMESTAMP
-    `);
-    stmt.run({ sku, mainupc, name, system_stock, actual_stock, status });
-    res.json({ success: true });
+    const storeId = requireStoreId(req);
+    const body = verificationSchema.parse(req.body);
+
+    const { data: existing } = await supabaseAdmin
+      .from('stock_verifications')
+      .select('id')
+      .eq('store_id', storeId)
+      .eq('sku', body.sku)
+      .is('report_id', null)
+      .maybeSingle();
+
+    if (existing) {
+      const { error } = await supabaseAdmin
+        .from('stock_verifications')
+        .update({
+          ...body,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existing.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabaseAdmin
+        .from('stock_verifications')
+        .insert({ ...body, store_id: storeId });
+      if (error) throw error;
+    }
+
+    return res.json({ success: true });
   } catch (error) {
-    console.error('Error saving verification:', error);
-    res.status(500).json({ error: 'Failed to save verification' });
+    return sendError(res, error, 'Failed to save verification');
   }
 });
 
 // Get all stock verifications (active/unreported only)
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const verifications = req.db!.prepare(`
-      SELECT sv.*, p.image_url, p.cost, p.price 
-      FROM stock_verifications sv 
-      LEFT JOIN products p ON sv.sku = p.sku 
-      WHERE sv.report_id IS NULL 
-      ORDER BY sv.created_at DESC
-    `).all();
-    res.json(verifications);
+    const storeId = requireStoreId(req);
+    const { data, error } = await supabaseAdmin
+      .from('stock_verifications')
+      .select('*')
+      .eq('store_id', storeId)
+      .is('report_id', null)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    const skus = [...new Set((data || []).map((row: any) => row.sku))];
+    const { data: products, error: productError } = await supabaseAdmin
+      .from('products')
+      .select('sku,image_url,cost,price')
+      .eq('store_id', storeId)
+      .in('sku', skus.length > 0 ? skus : ['__none__']);
+
+    if (productError) throw productError;
+    const productBySku = new Map((products || []).map((product: any) => [product.sku, product]));
+
+    return res.json((data || []).map((row: any) => {
+      const product = productBySku.get(row.sku) as any;
+      return {
+      ...row,
+      image_url: product?.image_url || '',
+      cost: Number(product?.cost || 0),
+      price: Number(product?.price || 0),
+    };
+    }));
   } catch (error) {
-    console.error('Error fetching verifications:', error);
-    res.status(500).json({ error: 'Failed to fetch verifications' });
+    return sendError(res, error, 'Failed to fetch verifications');
   }
 });
 
 // Clear all stock verifications (active ones)
-router.delete('/', (req, res) => {
+router.delete('/', async (req, res) => {
   try {
-    req.db!.exec('DELETE FROM stock_verifications WHERE report_id IS NULL');
-    res.json({ success: true, message: 'Verifications cleared' });
+    const storeId = requireStoreId(req);
+    const { error } = await supabaseAdmin
+      .from('stock_verifications')
+      .delete()
+      .eq('store_id', storeId)
+      .is('report_id', null);
+
+    if (error) throw error;
+    return res.json({ success: true, message: 'Verifications cleared' });
   } catch (error) {
-    console.error('Error clearing verifications:', error);
-    res.status(500).json({ error: 'Failed to clear verifications' });
+    return sendError(res, error, 'Failed to clear verifications');
   }
 });
 

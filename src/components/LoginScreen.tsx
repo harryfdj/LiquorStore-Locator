@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Package, Lock, User, AlertCircle } from 'lucide-react';
+import { AuthUser } from '../types';
 
 interface LoginScreenProps {
-  onLogin: (data: { token: string; role: 'admin' | 'store'; storeName?: string }) => void;
+  onLogin: (data: AuthUser) => void;
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {

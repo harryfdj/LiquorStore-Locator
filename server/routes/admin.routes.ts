@@ -1,108 +1,120 @@
 import express from 'express';
-import { adminDb, getStoreDb } from '../dbManager';
+import bcrypt from 'bcryptjs';
 import { requireAdmin } from '../middlewares/auth';
-import path from 'path';
-import fs from 'fs';
+import { mapStore, supabaseAdmin } from '../lib/supabase';
+import { parseBody, sendError } from '../lib/http';
+import { createStoreSchema, updateLocationSchema, updateMappingSchema } from '../lib/schemas';
 
 const router = express.Router();
 
 router.use(requireAdmin);
 
-router.get('/stores', (req, res) => {
+router.get('/stores', async (req, res) => {
   try {
-    const stores = adminDb.prepare('SELECT id, name, created_at, password, csv_mapping, lat, lng, radius_miles FROM stores ORDER BY id DESC').all();
-    res.json(stores.map((s: any) => ({
-      ...s,
-      csv_mapping: s.csv_mapping ? JSON.parse(s.csv_mapping) : {}
-    })));
+    const { data, error } = await supabaseAdmin
+      .from('stores')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return res.json((data || []).map(mapStore));
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch stores' });
+    return sendError(res, error, 'Failed to fetch stores');
   }
 });
 
-router.post('/stores', (req, res) => {
-  const { name, password } = req.body;
-  if (!name || !password) return res.status(400).json({ error: 'Name and password required' });
-
+router.post('/stores', async (req, res) => {
   try {
-    const result = adminDb.prepare('INSERT INTO stores (name, password) VALUES (?, ?)').run(name, password);
-    res.json({ id: result.lastInsertRowid, name, password, success: true });
-  } catch (error: any) {
-    if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-      res.status(400).json({ error: 'Store name already exists' });
-    } else {
-      res.status(500).json({ error: 'Failed to create store' });
-    }
-  }
-});
+    const { name, password, code } = parseBody(createStoreSchema, req.body);
+    const password_hash = await bcrypt.hash(password, 12);
+    const storeCode = code || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
-router.delete('/stores/:id', (req, res) => {
-  const { id } = req.params;
-  try {
-    adminDb.prepare('DELETE FROM stores WHERE id = ?').run(id);
-    
-    // Delete the isolated database file and connection
-    const dbPath = path.join(process.cwd(), `store_${id}.db`);
-    if (fs.existsSync(dbPath)) fs.unlinkSync(dbPath);
-    
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to delete store' });
-  }
-});
+    const { data, error } = await supabaseAdmin
+      .from('stores')
+      .insert({ name, code: storeCode, password_hash })
+      .select('*')
+      .single();
 
-router.delete('/stores/:id/data', (req, res) => {
-  const { id } = req.params;
-  try {
-    const storeDb = getStoreDb(Number(id));
-    storeDb.exec('DELETE FROM products');
-    storeDb.exec('DELETE FROM stock_verifications');
-    storeDb.exec('DELETE FROM weekly_reports');
-    
-    // Also delete all locally downloaded images for this specific store
-    const imagesDir = path.join(process.cwd(), 'public', `product-images-${id}`);
-    if (fs.existsSync(imagesDir)) {
-      fs.rmSync(imagesDir, { recursive: true, force: true });
+    if (error) {
+      if (error.code === '23505') return res.status(400).json({ error: 'Store code already exists' });
+      throw error;
     }
 
-    res.json({ success: true, message: 'Store data cleared' });
+    return res.status(201).json({ ...mapStore(data), success: true, temporary_password_set: true });
   } catch (error) {
-    console.error('Failed to clear store data:', error);
-    res.status(500).json({ error: 'Failed to clear store data', details: error instanceof Error ? error.message : String(error) });
+    return sendError(res, error, 'Failed to create store');
   }
 });
 
-router.put('/stores/:id/mapping', (req, res) => {
+router.delete('/stores/:id', async (req, res) => {
   const { id } = req.params;
-  const { mapping } = req.body;
-  if (!mapping || typeof mapping !== 'object') {
-    return res.status(400).json({ error: 'Valid mapping object required' });
-  }
-
   try {
-    adminDb.prepare('UPDATE stores SET csv_mapping = ? WHERE id = ?').run(JSON.stringify(mapping), id);
-    res.json({ success: true, mapping });
+    const { error } = await supabaseAdmin.from('stores').delete().eq('id', id);
+    if (error) throw error;
+    return res.json({ success: true });
   } catch (error) {
-    console.error('Failed to update mapping:', error);
-    res.status(500).json({ error: 'Failed to update mapping' });
+    return sendError(res, error, 'Failed to delete store');
   }
 });
 
-router.put('/stores/:id/location', (req, res) => {
+router.delete('/stores/:id/data', async (req, res) => {
   const { id } = req.params;
-  const { lat, lng, radius_miles } = req.body;
-  
   try {
-    adminDb.prepare('UPDATE stores SET lat = ?, lng = ?, radius_miles = ? WHERE id = ?').run(
-      lat ?? null, 
-      lng ?? null, 
-      radius_miles ?? null, 
-      id
-    );
-    res.json({ success: true });
+    const tables = ['stock_verifications', 'verification_reports', 'products'];
+    for (const table of tables) {
+      const { error } = await supabaseAdmin.from(table).delete().eq('store_id', id);
+      if (error) throw error;
+    }
+
+    const { data: files } = await supabaseAdmin.storage.from('product-images').list(id);
+    if (files && files.length > 0) {
+      await supabaseAdmin.storage.from('product-images').remove(files.map(file => `${id}/${file.name}`));
+    }
+
+    return res.json({ success: true, message: 'Store data cleared' });
   } catch (error) {
-    console.error('Failed to update store location:', error);
-    res.status(500).json({ error: 'Failed to update store location' });
+    return sendError(res, error, 'Failed to clear store data');
+  }
+});
+
+router.put('/stores/:id/mapping', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { mapping } = parseBody(updateMappingSchema, req.body);
+    const { data, error } = await supabaseAdmin
+      .from('stores')
+      .update({ csv_mapping: mapping })
+      .eq('id', id)
+      .select('*')
+      .single();
+
+    if (error) throw error;
+    return res.json({ ...mapStore(data), success: true, mapping });
+  } catch (error) {
+    return sendError(res, error, 'Failed to update mapping');
+  }
+});
+
+router.put('/stores/:id/location', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const body = parseBody(updateLocationSchema, req.body);
+    const { data, error } = await supabaseAdmin
+      .from('stores')
+      .update({
+        lat: body.lat ?? null,
+        lng: body.lng ?? null,
+        radius_miles: body.radius_miles ?? null,
+      })
+      .eq('id', id)
+      .select('*')
+      .single();
+
+    if (error) throw error;
+    return res.json({ ...mapStore(data), success: true });
+  } catch (error) {
+    return sendError(res, error, 'Failed to update store location');
   }
 });
 

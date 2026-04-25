@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Product } from '../types';
+import { apiFetch, apiJson } from '../lib/api';
 
 export function useInventory(searchQuery: string) {
   const [products, setProducts] = useState<Product[]>([]);
@@ -44,16 +45,13 @@ export function useInventory(searchQuery: string) {
       let url = `/api/products?q=${encodeURIComponent(query)}`;
       if (dept) url += `&dept=${encodeURIComponent(dept)}`;
       
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        setProducts(data);
-        setVisibleCount(20);
-        
-        if (!query && !dept && departments.length === 0) {
-          const depts = Array.from(new Set(data.map((p: Product) => p.depname))).filter(Boolean) as string[];
-          setDepartments(depts.sort());
-        }
+      const data = await apiJson<Product[]>(url);
+      setProducts(data);
+      setVisibleCount(20);
+      
+      if (!query && !dept && departments.length === 0) {
+        const depts = Array.from(new Set(data.map((p: Product) => p.depname))).filter(Boolean) as string[];
+        setDepartments(depts.sort());
       }
     } catch (error) {
       console.error('Failed to fetch products', error);
@@ -78,19 +76,14 @@ export function useInventory(searchQuery: string) {
     setUploadMessage(null);
 
     try {
-      const res = await fetch('/api/products/upload', {
+      const res = await apiFetch('/api/products/upload', {
         method: 'POST',
         body: formData,
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        setUploadMessage({ type: 'success', text: `Successfully updated ${data.count} items from CSV.` });
-        fetchProducts(searchQuery);
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Upload failed');
-      }
+      const data = await res.json();
+      setUploadMessage({ type: 'success', text: `Successfully updated ${data.count} items from CSV.${data.skipped ? ` Skipped ${data.skipped} invalid rows.` : ''}` });
+      fetchProducts(searchQuery);
     } catch (error: any) {
       setUploadMessage({ type: 'error', text: error.message || 'Failed to upload CSV file. Please check the format.' });
     } finally {
@@ -127,15 +120,12 @@ export function useInventory(searchQuery: string) {
 
       const results = await Promise.allSettled(
         batch.map(async (product) => {
-          const res = await fetch(`/api/products/${product.sku}/fetch-image`, { method: 'POST' });
-          if (res.ok) {
-            const data = await res.json();
-            if (data.image_url) {
-              setProducts(prev => prev.map(p =>
-                p.sku === product.sku ? { ...p, image_url: data.image_url } : p
-              ));
-              return true;
-            }
+          const data = await apiJson<{ image_url?: string }>(`/api/products/${product.sku}/fetch-image`, { method: 'POST' });
+          if (data.image_url) {
+            setProducts(prev => prev.map(p =>
+              p.sku === product.sku ? { ...p, image_url: data.image_url } : p
+            ));
+            return true;
           }
           return false;
         })
@@ -190,18 +180,15 @@ export function useInventory(searchQuery: string) {
 
   const saveEdits = async (sku: string) => {
     try {
-      const res = await fetch(`/api/products/${sku}`, {
+      await apiFetch(`/api/products/${sku}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ location: editLocation, image_url: editImageUrl, alt_upcs: editAltUpcs }),
       });
 
-      if (res.ok) {
-        setProducts(products.map(p => 
-          p.sku === sku ? { ...p, location: editLocation, image_url: editImageUrl, alt_upcs: editAltUpcs } : p
-        ));
-        setEditingSku(null);
-      }
+      setProducts(products.map(p => 
+        p.sku === sku ? { ...p, location: editLocation, image_url: editImageUrl, alt_upcs: editAltUpcs } : p
+      ));
+      setEditingSku(null);
     } catch (error) {
       console.error('Failed to save edits', error);
     }
@@ -212,11 +199,8 @@ export function useInventory(searchQuery: string) {
     setIsLoadingCandidates(true);
     setImageCandidates([]);
     try {
-      const res = await fetch(`/api/products/${sku}/image-candidates`);
-      if (res.ok) {
-        const data = await res.json();
-        setImageCandidates(data.candidates || []);
-      }
+      const data = await apiJson<{ candidates: string[] }>(`/api/products/${sku}/image-candidates`);
+      setImageCandidates(data.candidates || []);
     } catch (err) {
       console.error('Failed to fetch candidates', err);
     } finally {
@@ -229,18 +213,15 @@ export function useInventory(searchQuery: string) {
     if (!product) return;
     
     try {
-      const res = await fetch(`/api/products/${sku}`, {
+      const data = await apiJson<{ image_url?: string }>(`/api/products/${sku}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ location: product.location || '', image_url: url }),
       });
 
-      if (res.ok) {
-        setProducts(products.map(p => 
-          p.sku === sku ? { ...p, image_url: url } : p
-        ));
-        setImageSelectorSku(null);
-      }
+      setProducts(products.map(p => 
+        p.sku === sku ? { ...p, image_url: data.image_url || url } : p
+      ));
+      setImageSelectorSku(null);
     } catch (error) {
       console.error('Failed to save selected image', error);
     }

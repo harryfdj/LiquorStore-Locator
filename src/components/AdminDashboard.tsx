@@ -10,9 +10,11 @@ import { AdminConfirmModal } from './AdminConfirmModal';
 import { CsvMappingModal } from './CsvMappingModal';
 import { LocationModal } from './LocationModal';
 import { MapPin } from 'lucide-react';
+import { apiJson, apiFetch } from '../lib/api';
+import { StoreSummary } from '../types';
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout }) => {
-  const [stores, setStores] = useState<any[]>([]);
+  const [stores, setStores] = useState<StoreSummary[]>([]);
   const [newStoreName, setNewStoreName] = useState('');
   const [newStorePassword, setNewStorePassword] = useState('');
   const [loading, setLoading] = useState(true);
@@ -23,7 +25,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
     type: 'clear' | 'delete' | null;
-    store: any | null;
+    store: StoreSummary | null;
     isLoading: boolean;
   }>({
     isOpen: false,
@@ -34,7 +36,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
 
   const [mappingModalConfig, setMappingModalConfig] = useState<{
     isOpen: boolean;
-    store: any | null;
+    store: StoreSummary | null;
   }>({
     isOpen: false,
     store: null
@@ -42,7 +44,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
 
   const [locationModalConfig, setLocationModalConfig] = useState<{
     isOpen: boolean;
-    store: any | null;
+    store: StoreSummary | null;
   }>({
     isOpen: false,
     store: null
@@ -50,12 +52,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
 
   const fetchStores = async () => {
     try {
-      const res = await fetch('/api/admin/stores', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        setStores(await res.json());
-      }
+      setStores(await apiJson<StoreSummary[]>('/api/admin/stores'));
     } catch (e) {
       console.error(e);
     } finally {
@@ -75,26 +72,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
     setSuccessMsg('');
     
     try {
-      const res = await fetch('/api/admin/stores', {
+      const data = await apiJson<StoreSummary & { success: true }>('/api/admin/stores', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
         body: JSON.stringify({ name: newStoreName, password: newStorePassword })
       });
-      
-      const data = await res.json();
-      if (res.ok) {
-        setStores([data, ...stores]);
-        setNewStoreName('');
-        setNewStorePassword('');
-        setSuccessMsg(`Successfully created new isolated store: ${data.name}`);
-      } else {
-        setError(data.error);
-      }
+
+      setStores([data, ...stores]);
+      setNewStoreName('');
+      setNewStorePassword('');
+      setSuccessMsg(`Successfully created store account: ${data.name}`);
     } catch (e) {
-      setError('Network error');
+      setError(e instanceof Error ? e.message : 'Network error');
     }
   };
 
@@ -106,35 +94,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
 
     try {
       if (type === 'delete') {
-        const res = await fetch(`/api/admin/stores/${store.id}`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (res.ok) {
-          setStores(stores.filter(s => s.id !== store.id));
-        } else {
-          alert('Failed to delete store');
-        }
+        await apiFetch(`/api/admin/stores/${store.id}`, { method: 'DELETE' });
+        setStores(stores.filter(s => s.id !== store.id));
       } else if (type === 'clear') {
-        const res = await fetch(`/api/admin/stores/${store.id}/data`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (res.ok) {
-          setSuccessMsg(`Successfully cleared all data for ${store.name}`);
-          setTimeout(() => setSuccessMsg(''), 3000);
-        } else {
-          alert('Failed to clear store data');
-        }
+        await apiFetch(`/api/admin/stores/${store.id}/data`, { method: 'DELETE' });
+        setSuccessMsg(`Successfully cleared all data for ${store.name}`);
+        setTimeout(() => setSuccessMsg(''), 3000);
       }
     } catch (e) {
-      alert('Network error');
+      alert(e instanceof Error ? e.message : 'Network error');
     } finally {
       setModalConfig({ isOpen: false, type: null, store: null, isLoading: false });
     }
   };
 
-  const openConfirmModal = (store: any, type: 'clear' | 'delete') => {
+  const openConfirmModal = (store: StoreSummary, type: 'clear' | 'delete') => {
     setModalConfig({
       isOpen: true,
       type,
@@ -150,7 +124,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
           <Shield className="w-8 h-8 text-emerald-400" />
           <div>
             <h1 className="text-xl font-bold tracking-tight">Master Admin Dashboard</h1>
-            <p className="text-xs text-stone-400">Manage Multi-Tenant Database Architecture</p>
+            <p className="text-xs text-stone-400">Manage stores, Supabase data, and access controls</p>
           </div>
         </div>
         <button 
@@ -167,10 +141,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
         <section className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
           <div className="p-5 bg-gradient-to-r from-emerald-50 to-white border-b border-stone-200">
             <h2 className="text-lg font-bold text-stone-800 flex items-center gap-2">
-              <Plus className="w-5 h-5 text-emerald-600" /> Spawn New Isolated Store
+              <Plus className="w-5 h-5 text-emerald-600" /> Create Store Account
             </h2>
             <p className="text-sm text-stone-500 mt-1">
-              Creates a brand new separate database file (`store_X.db`) completely isolated from all other locations.
+              Creates a new store tenant in Supabase with securely hashed staff credentials.
             </p>
           </div>
           
@@ -180,7 +154,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
 
             <form onSubmit={handleCreateStore} className="flex flex-col sm:flex-row gap-4 items-end">
               <div className="flex-1 w-full">
-                <label className="text-sm font-bold text-stone-600 block mb-1.5 ml-1">Store Username (Identifier)</label>
+                <label className="text-sm font-bold text-stone-600 block mb-1.5 ml-1">Store Name</label>
                 <div className="relative">
                   <Store className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
                   <input
@@ -193,11 +167,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
                 </div>
               </div>
               <div className="flex-1 w-full">
-                <label className="text-sm font-bold text-stone-600 block mb-1.5 ml-1">Employee Password</label>
+                <label className="text-sm font-bold text-stone-600 block mb-1.5 ml-1">Temporary Staff Password</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
                   <input
-                    type="text"
+                    type="password"
                     value={newStorePassword}
                     onChange={e => setNewStorePassword(e.target.value)}
                     className="w-full pl-9 pr-4 py-2 bg-stone-50 border border-stone-300 rounded-xl text-stone-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-shadow font-mono text-sm"
@@ -209,7 +183,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
                 type="submit"
                 className="w-full sm:w-auto mt-2 sm:mt-0 px-6 py-2.5 bg-stone-900 border-2 border-stone-900 hover:bg-stone-800 text-white font-bold rounded-xl shadow-md transition-all active:scale-95 whitespace-nowrap"
               >
-                Launch DB
+                Create Store
               </button>
             </form>
           </div>
@@ -219,10 +193,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
         <section className="bg-white rounded-2xl shadow-sm border border-stone-200">
           <div className="p-5 border-b border-stone-200 flex justify-between items-center bg-stone-50 rounded-t-2xl">
             <h2 className="text-lg font-bold text-stone-800 flex items-center gap-2">
-              <Package className="w-5 h-5 text-stone-500" /> Active Store Databases
+              <Package className="w-5 h-5 text-stone-500" /> Active Stores
             </h2>
             <span className="bg-stone-200 text-stone-600 px-3 py-1 rounded-full text-xs font-bold leading-none select-none">
-              {stores.length} DBs ACTIVE
+              {stores.length} ACTIVE
             </span>
           </div>
 
@@ -233,7 +207,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
               <div className="p-12 text-center text-stone-500 flex flex-col items-center">
                 <Store className="w-12 h-12 text-stone-300 mb-3" />
                 <h3 className="font-bold text-lg text-stone-400">No stores created</h3>
-                <p className="text-sm">Use the form above to deploy your first isolated tenant.</p>
+                <p className="text-sm">Use the form above to create your first store.</p>
               </div>
             ) : (
               stores.map(store => (
@@ -245,9 +219,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
                     <div>
                       <h3 className="font-bold text-lg tracking-tight leading-tight">{store.name}</h3>
                       <div className="flex items-center gap-3 mt-1 text-xs font-mono text-stone-500">
-                        <span className="flex items-center gap-1"><Lock className="w-3 h-3 text-stone-400" /> PWD: {store.password}</span>
+                        <span className="flex items-center gap-1"><Lock className="w-3 h-3 text-stone-400" /> Code: {store.code}</span>
                         <span className="text-stone-300">•</span>
-                        <span>store_{store.id}.db</span>
+                        <span>Supabase tenant</span>
                       </div>
                     </div>
                   </div>
@@ -303,7 +277,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
         isOpen={mappingModalConfig.isOpen}
         onClose={() => setMappingModalConfig({ isOpen: false, store: null })}
         store={mappingModalConfig.store}
-        token={token}
         onSuccess={(updatedStore) => {
           setStores(stores.map(s => s.id === updatedStore.id ? updatedStore : s));
         }}
@@ -313,7 +286,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
         isOpen={locationModalConfig.isOpen}
         onClose={() => setLocationModalConfig({ isOpen: false, store: null })}
         store={locationModalConfig.store}
-        token={token}
         onSuccess={(updatedStore) => {
           setStores(stores.map(s => s.id === updatedStore.id ? updatedStore : s));
         }}

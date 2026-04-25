@@ -2,6 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import https from 'https';
 import http from 'http';
+import { config } from '../lib/config';
+import { supabaseAdmin } from '../lib/supabase';
 
 // Fetch a URL and return the HTML body
 export const fetchPage = (url: string): Promise<string> => {
@@ -131,4 +133,53 @@ export const downloadImage = (url: string, sku: string, storeId: number): Promis
       reject(err);
     }
   });
+};
+
+export const downloadImageToStorage = async (url: string, sku: string, storeId: string): Promise<string> => {
+  const parsedUrl = new URL(url);
+  if (!['https:', 'http:'].includes(parsedUrl.protocol)) {
+    throw new Error('Unsupported image protocol');
+  }
+
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      Referer: parsedUrl.origin,
+      Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+    },
+    redirect: 'follow',
+  });
+
+  if (!response.ok) {
+    throw new Error(`Image download failed with status ${response.status}`);
+  }
+
+  const contentType = response.headers.get('content-type') || 'image/jpeg';
+  if (!contentType.startsWith('image/')) {
+    throw new Error(`Remote URL did not return an image (${contentType})`);
+  }
+
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (bytes.byteLength > 5 * 1024 * 1024) {
+    throw new Error('Image is larger than the 5MB storage limit');
+  }
+
+  const extension = contentType.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
+  const safeSku = sku.replace(/[^a-z0-9_-]/gi, '_');
+  const objectPath = `${storeId}/${safeSku}-${Date.now()}.${extension}`;
+
+  const { error } = await supabaseAdmin.storage
+    .from(config.PRODUCT_IMAGE_BUCKET)
+    .upload(objectPath, bytes, {
+      contentType,
+      upsert: true,
+    });
+
+  if (error) throw error;
+
+  const { data } = supabaseAdmin.storage
+    .from(config.PRODUCT_IMAGE_BUCKET)
+    .getPublicUrl(objectPath);
+
+  return data.publicUrl;
 };

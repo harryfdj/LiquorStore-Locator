@@ -13,30 +13,11 @@ import { LoginScreen } from './components/LoginScreen';
 import { AdminDashboard } from './components/AdminDashboard';
 import { GeoFence } from './components/GeoFence';
 import { LogOut } from 'lucide-react';
-
-// Setup Global Fetch Interceptor for Auth Token
-const originalFetch = window.fetch;
-window.fetch = async (...args) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    if (args[1]) {
-      args[1].headers = { ...args[1].headers, Authorization: `Bearer ${token}` };
-    } else {
-      args[1] = { headers: { Authorization: `Bearer ${token}` } };
-    }
-  }
-  const response = await originalFetch(...args);
-  if (response.status === 401) {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user_role');
-    localStorage.removeItem('store_name');
-    window.location.reload();
-  }
-  return response;
-};
+import { apiJson, clearStoredSession } from './lib/api';
+import { AuthUser } from './types';
 
 export default function App() {
-  const [user, setUser] = useState<{ role: 'admin' | 'store', token: string, storeName?: string } | null>(() => {
+  const [user, setUser] = useState<AuthUser | null>(() => {
     const token = localStorage.getItem('token');
     const role = localStorage.getItem('user_role') as 'admin' | 'store';
     const storeName = localStorage.getItem('store_name') || undefined;
@@ -44,7 +25,13 @@ export default function App() {
     return null;
   });
 
-  const handleLogin = (data: { token: string; role: 'admin' | 'store'; storeName?: string }) => {
+  useEffect(() => {
+    const expire = () => setUser(null);
+    window.addEventListener('auth:expired', expire);
+    return () => window.removeEventListener('auth:expired', expire);
+  }, []);
+
+  const handleLogin = (data: AuthUser) => {
     localStorage.setItem('token', data.token);
     localStorage.setItem('user_role', data.role);
     if (data.storeName) localStorage.setItem('store_name', data.storeName);
@@ -52,9 +39,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user_role');
-    localStorage.removeItem('store_name');
+    clearStoredSession();
     setUser(null);
   };
 
@@ -69,7 +54,7 @@ export default function App() {
   return <StoreApp user={user} onLogout={handleLogout} />;
 }
 
-function StoreApp({ user, onLogout }: { user: any, onLogout: () => void }) {
+function StoreApp({ user, onLogout }: { user: AuthUser, onLogout: () => void }) {
   const [activeTab, setActiveTab] = useState<'inventory' | 'verify' | 'reports'>('inventory');
   const [searchQuery, setSearchQuery] = useState('');
   const [isScanning, setIsScanning] = useState(false);
@@ -83,8 +68,7 @@ function StoreApp({ user, onLogout }: { user: any, onLogout: () => void }) {
   const inventory = useInventory(searchQuery);
 
   useEffect(() => {
-    fetch('/api/auth/me')
-      .then(r => r.json())
+    apiJson<AuthUser>('/api/auth/me')
       .then(data => {
         if (data.role === 'store') {
           setStoreConfig({

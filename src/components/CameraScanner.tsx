@@ -212,7 +212,7 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsScanning(false)}></div>
         
         {/* Modal */}
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col relative z-10 transform transition-transform duration-200 scale-100">
+        <div role="dialog" aria-modal="true" aria-label="Barcode scanner" className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col relative z-10 transform transition-transform duration-200 scale-100">
           <div className="p-4 bg-stone-100 border-b border-stone-200 flex justify-between items-center">
             <h3 className="font-bold text-stone-800">Scan Barcode</h3>
             <button onClick={() => setIsScanning(false)} className="p-2 hover:bg-stone-200 rounded-full transition-colors">
