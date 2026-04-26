@@ -24,6 +24,12 @@ function normalizeCode(value: string) {
   return value.trim();
 }
 
+function partialMatchCodes(product: ProductRow) {
+  return [product.mainupc, ...(product.alt_upcs || [])]
+    .filter(Boolean)
+    .filter(code => code.length >= 6);
+}
+
 async function productsForStore(storeId: string) {
   const products: ProductRow[] = [];
   let from = 0;
@@ -74,7 +80,7 @@ function findProductByOrderLine(products: ProductRow[], line: ParsedAlabamaOrder
   if (upc.length >= 6) {
     const candidates = products
       .filter(product => {
-        const codes = [product.mainupc, ...(product.alt_upcs || [])].filter(Boolean);
+        const codes = partialMatchCodes(product);
         return codes.some(code => code.includes(upc) || upc.includes(code));
       })
       .slice(0, 10);

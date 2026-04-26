@@ -155,6 +155,91 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({
 
   return (
     <div className="flex flex-col gap-6">
+      {bulkCandidates.length > 0 && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6">
+          <div
+            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+            onClick={() => setBulkCandidates([])}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bulk-candidates-dialog-title"
+            className="surface-card relative w-full max-w-2xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 ease-out"
+          >
+            <div className="h-2 w-full bg-amber-400" />
+            <div className="p-5 sm:p-6">
+              <div className="mb-5 flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-2xl bg-amber-50 p-3 text-amber-700">
+                    <AlertCircle className="h-7 w-7" />
+                  </div>
+                  <div>
+                    <h3 id="bulk-candidates-dialog-title" className="text-xl font-bold leading-tight text-slate-950">
+                      Multiple UPC matches found
+                    </h3>
+                    <p className="mt-1 text-sm leading-6 text-slate-600">
+                      Choose the correct item to apply location{' '}
+                      <span className="font-semibold text-lime-700">{normalizeLocation(activeLocation)}</span>.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setBulkCandidates([])}
+                  className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                >
+                  <X className="h-5 w-5" />
+                  <span className="sr-only">Close multiple matches popup</span>
+                </button>
+              </div>
+
+              <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+                {bulkCandidates.map(candidate => (
+                  <button
+                    key={candidate.sku}
+                    type="button"
+                    onClick={() => handleBulkLocationProduct(candidate)}
+                    className="w-full rounded-3xl border border-slate-200 bg-white p-3 text-left transition-colors hover:border-lime-300 hover:bg-lime-50"
+                  >
+                    <div className="flex gap-3">
+                      {candidate.image_url ? (
+                        <img
+                          src={proxyUrl(candidate.image_url)}
+                          alt={candidate.name}
+                          className="h-16 w-16 shrink-0 rounded-2xl border border-slate-100 bg-slate-50 object-contain p-1"
+                        />
+                      ) : (
+                        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50">
+                          <ImageIcon className="h-6 w-6 text-slate-300" />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold leading-snug text-slate-950">{candidate.name}</p>
+                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+                          <span>SKU <span className="font-mono text-slate-700">{candidate.sku}</span></span>
+                          <span>UPC <span className="font-mono text-slate-700">{candidate.mainupc || 'N/A'}</span></span>
+                          <span>Location <span className="font-semibold text-slate-700">{candidate.location || 'None'}</span></span>
+                        </div>
+                        <p className="mt-2 text-xs font-semibold text-lime-700">Select this item</p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setBulkCandidates([])}
+                className="btn-secondary mt-5 w-full px-4 py-3 text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {bulkDecision && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6">
           <div
@@ -319,31 +404,6 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({
             <div className={`mt-4 flex items-center gap-2 rounded-2xl border p-4 text-sm font-medium ${bulkMessage.type === 'success' ? 'border-lime-200 bg-lime-50 text-lime-800' : 'border-red-200 bg-red-50 text-red-700'}`}>
               {bulkMessage.type === 'success' ? <CheckCircle className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
               <span>{bulkMessage.text}</span>
-            </div>
-          )}
-
-          {bulkCandidates.length > 0 && (
-            <div className="mt-4 rounded-3xl border border-amber-200 bg-amber-50 p-4">
-              <div className="flex items-start gap-3 text-amber-900">
-                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
-                <div>
-                  <p className="font-semibold">Multiple matches found</p>
-                  <p className="text-sm text-amber-800">Choose the correct item to apply location {normalizeLocation(activeLocation)}.</p>
-                </div>
-              </div>
-              <div className="mt-3 grid gap-2">
-                {bulkCandidates.map(candidate => (
-                  <button
-                    key={candidate.sku}
-                    type="button"
-                    onClick={() => handleBulkLocationProduct(candidate)}
-                    className="rounded-2xl border border-amber-200 bg-white p-3 text-left text-sm transition-colors hover:border-lime-300 hover:bg-lime-50"
-                  >
-                    <span className="font-semibold text-slate-950">{candidate.name}</span>
-                    <span className="ml-2 text-xs text-slate-500">SKU {candidate.sku} · UPC {candidate.mainupc || 'N/A'} · Location {candidate.location || 'None'}</span>
-                  </button>
-                ))}
-              </div>
             </div>
           )}
 
