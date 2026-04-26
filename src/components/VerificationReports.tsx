@@ -3,7 +3,7 @@ import { FileText, AlertTriangle, CheckCircle, Trash2, Archive, CalendarDays, Ba
 import Barcode from 'react-barcode';
 import { Verification, WeeklyReport } from '../types';
 import { apiFetch, apiJson } from '../lib/api';
-import { proxyUrl } from './InventoryTab';
+import { proxyUrl } from '../lib/images';
 
 export function VerificationReports() {
   const [verifications, setVerifications] = useState<Verification[]>([]);
@@ -72,7 +72,7 @@ export function VerificationReports() {
     }
   };
 
-  if (isLoading) return <div className="text-center py-12 text-stone-500">Loading reports...</div>;
+  if (isLoading) return <div className="text-center py-12 text-slate-500">Loading reports...</div>;
 
   const mismatches = verifications.filter(v => v.status === 'mismatched');
   const matches = verifications.filter(v => v.status === 'matched');
@@ -84,13 +84,14 @@ export function VerificationReports() {
     <div className="max-w-5xl mx-auto">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-stone-800">Verification Report</h2>
-          <p className="text-stone-500">Review your weekly stock verification results.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Reporting</p>
+          <h2 className="mt-1 text-2xl font-semibold text-slate-950">Verification Report</h2>
+          <p className="text-slate-500">Review your weekly stock verification results.</p>
         </div>
         <button 
           onClick={handleFinalizeReport}
           disabled={verifications.length === 0}
-          className="flex items-center gap-2 bg-stone-800 text-white px-5 py-2.5 rounded-xl font-medium hover:bg-stone-900 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          className="btn-primary flex items-center gap-2 px-5 py-2.5 text-sm"
         >
           <Archive className="w-4 h-4" />
           Mark as Reported
@@ -107,44 +108,44 @@ export function VerificationReports() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
         <div 
           onClick={() => setFilter('all')}
-          className={`cursor-pointer bg-white p-6 rounded-2xl shadow-sm border transition-all ${filter === 'all' ? 'border-stone-800 ring-2 ring-stone-800 ring-offset-2' : 'border-stone-200 hover:border-stone-300'}`}
+          className={`cursor-pointer surface-panel p-6 transition-all ${filter === 'all' ? 'border-slate-950 ring-4 ring-slate-200' : 'hover:border-slate-300'}`}
         >
-          <div className="text-stone-500 text-sm font-medium uppercase tracking-wider mb-2">Total Verified</div>
-          <div className="text-4xl font-bold text-stone-800">{verifications.length}</div>
+          <div className="text-slate-500 text-sm font-medium uppercase tracking-wider mb-2">Total Verified</div>
+          <div className="text-4xl font-semibold text-slate-950">{verifications.length}</div>
         </div>
         <div 
           onClick={() => setFilter('matched')}
-          className={`cursor-pointer bg-emerald-50 p-6 rounded-2xl shadow-sm border transition-all ${filter === 'matched' ? 'border-emerald-500 ring-2 ring-emerald-500 ring-offset-2' : 'border-emerald-100 hover:border-emerald-200'}`}
+          className={`cursor-pointer surface-panel bg-lime-50 p-6 transition-all ${filter === 'matched' ? 'border-lime-300 ring-4 ring-lime-100' : 'border-lime-100 hover:border-lime-200'}`}
         >
-          <div className="text-emerald-600 text-sm font-medium uppercase tracking-wider mb-2 flex items-center gap-2">
+          <div className="text-lime-700 text-sm font-medium uppercase tracking-wider mb-2 flex items-center gap-2">
             <CheckCircle className="w-4 h-4" /> Matched
           </div>
-          <div className="text-4xl font-bold text-emerald-700">{matches.length}</div>
+          <div className="text-4xl font-semibold text-lime-800">{matches.length}</div>
         </div>
         <div 
           onClick={() => setFilter('mismatched')}
-          className={`cursor-pointer bg-red-50 p-6 rounded-2xl shadow-sm border transition-all ${filter === 'mismatched' ? 'border-red-500 ring-2 ring-red-500 ring-offset-2' : 'border-red-100 hover:border-red-200'}`}
+          className={`cursor-pointer surface-panel bg-red-50 p-6 transition-all ${filter === 'mismatched' ? 'border-red-300 ring-4 ring-red-100' : 'border-red-100 hover:border-red-200'}`}
         >
           <div className="text-red-600 text-sm font-medium uppercase tracking-wider mb-2 flex items-center gap-2">
             <AlertTriangle className="w-4 h-4" /> Mismatched
           </div>
-          <div className="text-4xl font-bold text-red-700">{mismatches.length}</div>
+          <div className="text-4xl font-semibold text-red-700">{mismatches.length}</div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <div className="bg-sky-50 p-6 rounded-2xl shadow-sm border border-sky-100">
+        <div className="surface-panel bg-sky-50 p-6 border-sky-100">
           <div className="text-sky-600 text-sm font-medium uppercase tracking-wider mb-2">Total Verified Cost</div>
-          <div className="text-4xl font-bold text-sky-700">${totalValueCost.toFixed(2)}</div>
+          <div className="text-4xl font-semibold text-sky-700">${totalValueCost.toFixed(2)}</div>
         </div>
-        <div className="bg-blue-50 p-6 rounded-2xl shadow-sm border border-blue-100">
+        <div className="surface-panel bg-blue-50 p-6 border-blue-100">
           <div className="text-blue-600 text-sm font-medium uppercase tracking-wider mb-2">Total Verified Retail Value</div>
-          <div className="text-4xl font-bold text-blue-700">${totalValueRetail.toFixed(2)}</div>
+          <div className="text-4xl font-semibold text-blue-700">${totalValueRetail.toFixed(2)}</div>
         </div>
       </div>
 
       {(filter === 'all' || filter === 'mismatched') && (
-        <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden mb-8">
+        <div className="surface-card overflow-hidden mb-8">
           <div className="p-6 border-b border-stone-100 bg-stone-50 flex justify-between items-center">
             <h3 className="text-lg font-bold text-stone-800 flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-red-500" />
@@ -159,7 +160,28 @@ export function VerificationReports() {
               <p>All verified items match the system stock.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+            <div className="md:hidden p-4 space-y-3">
+              {mismatches.map((v) => {
+                const diff = v.actual_stock - v.system_stock;
+                return (
+                  <div key={v.id} className="border border-stone-200 rounded-xl p-3 bg-stone-50">
+                    <div className="flex justify-between items-start gap-3">
+                      <p className="font-semibold text-stone-800">{v.name}</p>
+                      <span className={`px-2 py-1 rounded-md text-xs font-bold ${diff > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>{diff > 0 ? '+' : ''}{diff}</span>
+                    </div>
+                    <p className="text-xs text-stone-500 mt-1">{new Date(v.created_at).toLocaleString()}</p>
+                    <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
+                      <p><span className="text-stone-500">System:</span> {v.system_stock}</p>
+                      <p><span className="text-stone-500">Actual:</span> {v.actual_stock}</p>
+                      <p><span className="text-stone-500">Cost:</span> ${v.cost?.toFixed(2) || '0.00'}</p>
+                      <p><span className="text-stone-500">Value:</span> ${(v.actual_stock * (v.cost || 0)).toFixed(2)}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left border-collapse min-w-[700px]">
                 <thead>
                   <tr className="bg-stone-50 border-b border-stone-200">
@@ -219,12 +241,13 @@ export function VerificationReports() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </div>
       )}
 
       {(filter === 'all' || filter === 'matched') && (
-        <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
+        <div className="surface-card overflow-hidden">
           <div className="p-6 border-b border-stone-100 bg-stone-50 flex justify-between items-center">
             <h3 className="text-lg font-bold text-stone-800 flex items-center gap-2">
               <CheckCircle className="w-5 h-5 text-emerald-500" />
@@ -239,7 +262,25 @@ export function VerificationReports() {
               <p>Scan items to see them listed here when their stock matches perfectly.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+            <div className="md:hidden p-4 space-y-3">
+              {matches.map((v) => (
+                <div key={v.id} className="border border-stone-200 rounded-xl p-3 bg-stone-50">
+                  <div className="flex justify-between items-start gap-3">
+                    <p className="font-semibold text-stone-800">{v.name}</p>
+                    <span className="px-2 py-1 rounded-md text-xs font-bold bg-emerald-100 text-emerald-700">Perfect</span>
+                  </div>
+                  <p className="text-xs text-stone-500 mt-1">{new Date(v.created_at).toLocaleString()}</p>
+                  <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
+                    <p><span className="text-stone-500">System:</span> {v.system_stock}</p>
+                    <p><span className="text-stone-500">Actual:</span> {v.actual_stock}</p>
+                    <p><span className="text-stone-500">Cost:</span> ${v.cost?.toFixed(2) || '0.00'}</p>
+                    <p><span className="text-stone-500">Value:</span> ${(v.actual_stock * (v.cost || 0)).toFixed(2)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left border-collapse min-w-[700px]">
                 <thead>
                   <tr className="bg-stone-50 border-b border-stone-200">
@@ -296,12 +337,13 @@ export function VerificationReports() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </div>
       )}
 
       {/* PASt WEEKLY REPORTS */}
-      <div className="mt-12 bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
+      <div className="surface-card mt-12 overflow-hidden">
         <div className="p-6 border-b border-stone-100 bg-stone-50 flex justify-between items-center">
           <h3 className="text-lg font-bold text-stone-800 flex items-center gap-2">
             <CalendarDays className="w-5 h-5 text-stone-500" />
@@ -316,7 +358,26 @@ export function VerificationReports() {
             <p className="text-sm">When you click "Mark as Reported", your weekly totals will be archived here.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          <div className="md:hidden p-4 space-y-3">
+            {pastReports.map((report) => (
+              <button
+                key={report.id}
+                onClick={() => handleExpandReport(report.id)}
+                className="w-full text-left border border-stone-200 rounded-xl p-3 bg-stone-50"
+              >
+                <p className="font-semibold text-stone-800">{new Date(report.created_at).toLocaleDateString()}</p>
+                <p className="text-xs text-stone-500 mt-1">{new Date(report.created_at).toLocaleTimeString()}</p>
+                <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
+                  <p><span className="text-stone-500">Scanned:</span> {report.total_scanned}</p>
+                  <p><span className="text-stone-500">Matched:</span> {report.total_matched}</p>
+                  <p><span className="text-stone-500">Mismatched:</span> {report.total_mismatched}</p>
+                  <p><span className="text-stone-500">Cost:</span> ${report.total_value_cost != null ? report.total_value_cost.toFixed(2) : '0.00'}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-stone-50 border-b border-stone-200">
@@ -506,6 +567,7 @@ export function VerificationReports() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 

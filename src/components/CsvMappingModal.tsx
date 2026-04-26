@@ -66,11 +66,11 @@ export const CsvMappingModal: React.FC<CsvMappingModalProps> = ({ isOpen, onClos
   };
 
   return (
-    <div className="fixed inset-0 bg-stone-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden border border-stone-200 flex flex-col max-h-[90vh]">
-        <div className="p-5 border-b border-stone-200 bg-stone-50 flex items-center justify-between shrink-0">
+    <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+      <div className="surface-card w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-emerald-100 text-emerald-700 rounded-lg">
+            <div className="p-2 bg-lime-100 text-slate-950 rounded-2xl">
               <Settings className="w-5 h-5" />
             </div>
             <div>
@@ -99,7 +99,7 @@ export const CsvMappingModal: React.FC<CsvMappingModalProps> = ({ isOpen, onClos
                   type="text" 
                   value={mapping[f.key] || ''}
                   onChange={e => setMapping({...mapping, [f.key]: e.target.value})}
-                  className="flex-1 bg-stone-50 border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                  className="control-input flex-1 px-3 py-2 text-sm font-mono"
                   placeholder="e.g. ItemDesc"
                 />
               </div>
@@ -110,17 +110,17 @@ export const CsvMappingModal: React.FC<CsvMappingModalProps> = ({ isOpen, onClos
           </p>
         </div>
 
-        <div className="p-5 border-t border-stone-200 bg-stone-50 flex gap-3 justify-end shrink-0">
+        <div className="p-5 border-t border-slate-200 bg-slate-50 flex gap-3 justify-end shrink-0">
           <button 
             onClick={onClose}
-            className="px-4 py-2 font-semibold text-stone-600 hover:bg-stone-200 bg-stone-100 rounded-xl transition-colors text-sm"
+            className="btn-secondary px-4 py-2 text-sm"
           >
             Cancel
           </button>
           <button 
             onClick={handleSave}
             disabled={loading}
-            className="flex items-center gap-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold rounded-xl shadow-sm transition-colors text-sm"
+            className="btn-primary flex items-center gap-2 px-6 py-2 text-sm"
           >
             {loading ? 'Saving...' : <><Save className="w-4 h-4" /> Save Mappings</>}
           </button>

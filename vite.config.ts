@@ -15,6 +15,20 @@ export default defineConfig(({mode}) => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return;
+            if (id.includes('react-barcode')) return 'vendor-barcode';
+            if (id.includes('html5-qrcode')) return 'vendor-scanner';
+            if (id.includes('lucide-react')) return 'vendor-icons';
+            if (id.includes('@supabase')) return 'vendor-supabase';
+            return 'vendor';
+          },
+        },
+      },
+    },
     publicDir: false,
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.

@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, Search, Image as ImageIcon, ExternalLink, Clipboard } from 'lucide-react';
-import { proxyUrl } from './InventoryTab';
+import { proxyUrl } from '../lib/images';
 import { Product } from '../types';
 
 interface ImageSelectorModalProps {
@@ -16,12 +16,18 @@ export const ImageSelectorModal: React.FC<ImageSelectorModalProps> = ({
   imageSelectorSku, imageCandidates, isLoadingCandidates, products,
   setImageSelectorSku, selectImage
 }) => {
+  const [manualUrl, setManualUrl] = React.useState('');
+
+  React.useEffect(() => {
+    if (imageSelectorSku) setManualUrl('');
+  }, [imageSelectorSku]);
+
   if (!imageSelectorSku) return null;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl p-6 max-w-4xl w-full shadow-2xl max-h-[90vh] flex flex-col">
-        <div className="flex justify-between items-center mb-4">
+      <div role="dialog" aria-modal="true" aria-label="Select product image" className="surface-card p-6 max-w-5xl w-full shadow-2xl max-h-[90vh] flex flex-col">
+        <div className="flex justify-between items-center mb-4 sticky top-0 bg-white z-10">
           <div>
             <h2 className="text-xl font-bold">Select Better Image</h2>
             <p className="text-sm text-stone-500 mt-1">
@@ -38,11 +44,12 @@ export const ImageSelectorModal: React.FC<ImageSelectorModalProps> = ({
             <input 
               type="text" 
               placeholder="Paste image URL here and press Enter..." 
-              className="w-full border border-stone-300 rounded-lg pl-3 pr-10 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              value={manualUrl}
+              onChange={(e) => setManualUrl(e.target.value)}
+              className="control-input w-full pl-3 pr-10 py-2 text-sm"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
-                  const val = (e.target as HTMLInputElement).value;
-                  if (val) selectImage(imageSelectorSku, val);
+                  if (manualUrl.trim()) selectImage(imageSelectorSku, manualUrl.trim());
                 }
               }}
             />
@@ -52,13 +59,16 @@ export const ImageSelectorModal: React.FC<ImageSelectorModalProps> = ({
             onClick={async () => {
               try {
                 const text = await navigator.clipboard.readText();
-                if (text) selectImage(imageSelectorSku, text);
+                if (text) {
+                  setManualUrl(text.trim());
+                  selectImage(imageSelectorSku, text.trim());
+                }
               } catch (err) {
                 console.error('Failed to read clipboard', err);
                 alert('Could not read clipboard. Please paste manually.');
               }
             }}
-            className="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+            className="bg-lime-100 hover:bg-lime-200 text-slate-950 px-4 py-2 rounded-2xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
           >
             <Clipboard className="w-4 h-4" />
             Paste & Use
@@ -67,7 +77,7 @@ export const ImageSelectorModal: React.FC<ImageSelectorModalProps> = ({
             href={`https://www.google.com/search?tbm=isch&q=${encodeURIComponent((products.find(p => p.sku === imageSelectorSku)?.name || '') + ' bottle')}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-stone-100 hover:bg-stone-200 text-stone-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
+            className="btn-secondary px-4 py-2 text-sm flex items-center justify-center gap-2 whitespace-nowrap"
           >
             <Search className="w-4 h-4" />
             Search Google
@@ -84,19 +94,20 @@ export const ImageSelectorModal: React.FC<ImageSelectorModalProps> = ({
             {imageCandidates.map((url, idx) => (
               <div 
                 key={idx} 
-                className="break-inside-avoid mb-4 border-2 border-transparent hover:border-emerald-500 rounded-xl overflow-hidden cursor-pointer bg-stone-100 flex items-center justify-center group relative"
+                className="break-inside-avoid mb-4 border-2 border-transparent hover:border-lime-300 rounded-2xl overflow-hidden cursor-pointer bg-slate-100 flex items-center justify-center group relative"
                 onClick={() => selectImage(imageSelectorSku, url)}
               >
                 <img 
                   src={proxyUrl(url)} 
                   alt="Candidate" 
                   className="w-full h-auto object-contain"
+                  loading="lazy"
                   onError={(e) => {
                     (e.target as HTMLImageElement).parentElement!.style.display = 'none';
                   }}
                 />
-                <div className="absolute inset-0 bg-emerald-500/0 group-hover:bg-emerald-500/10 transition-colors flex items-center justify-center">
-                  <span className="opacity-0 group-hover:opacity-100 bg-emerald-600 text-white text-xs font-bold px-2 py-1 rounded-lg transition-opacity shadow-sm">
+                <div className="absolute inset-0 bg-lime-300/0 group-hover:bg-lime-300/20 transition-colors flex items-center justify-center">
+                  <span className="opacity-0 group-hover:opacity-100 bg-slate-950 text-white text-xs font-semibold px-2 py-1 rounded-lg transition-opacity shadow-sm">
                     Select
                   </span>
                 </div>

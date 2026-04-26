@@ -77,10 +77,12 @@ export const GeoFence: React.FC<GeoFenceProps> = ({ storeLat, storeLng, radiusMi
   // Waiting for GPS
   if (hasPermission === null) {
     return (
-      <div className="min-h-screen bg-stone-900 flex flex-col items-center justify-center p-6 text-center text-white">
-        <Navigation className="w-16 h-16 text-blue-500 mb-6 animate-pulse" />
-        <h2 className="text-2xl font-bold mb-2">Acquiring GPS Signal...</h2>
-        <p className="text-stone-400">Please wait while we verify your location for security.</p>
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center text-slate-950">
+        <div className="surface-card max-w-md p-8">
+          <Navigation className="w-16 h-16 text-lime-700 mb-6 mx-auto animate-pulse" />
+          <h2 className="text-2xl font-semibold mb-2">Acquiring GPS Signal...</h2>
+          <p className="text-slate-500">Please wait while we verify your location for security.</p>
+        </div>
       </div>
     );
   }
@@ -88,13 +90,15 @@ export const GeoFence: React.FC<GeoFenceProps> = ({ storeLat, storeLng, radiusMi
   // User outright denied location permissions
   if (hasPermission === false) {
     return (
-      <div className="min-h-screen bg-stone-900 flex flex-col items-center justify-center p-6 text-center text-white">
-        <MapPinOff className="w-20 h-20 text-red-500 mb-6" />
-        <h2 className="text-3xl font-bold mb-3 text-red-500">Location Required</h2>
-        <p className="text-stone-300 max-w-md text-lg">
-          This application requires GPS permission to ensure you are physically inside the store.
-        </p>
-        <p className="text-stone-500 mt-6 text-sm">Please enable location services in your browser settings and refresh the page.</p>
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center text-slate-950">
+        <div className="surface-card max-w-md p-8">
+          <MapPinOff className="w-20 h-20 text-red-500 mb-6 mx-auto" />
+          <h2 className="text-3xl font-semibold mb-3 text-red-600">Location Required</h2>
+          <p className="text-slate-600 text-lg">
+            This application requires GPS permission to ensure you are physically inside the store.
+          </p>
+          <p className="text-slate-500 mt-6 text-sm">Please enable location services in your browser settings and refresh the page.</p>
+        </div>
       </div>
     );
   }
@@ -102,13 +106,17 @@ export const GeoFence: React.FC<GeoFenceProps> = ({ storeLat, storeLng, radiusMi
   // Employee is outside the barrier map
   if (!isWithinBounds) {
     return (
-      <div className="min-h-screen bg-stone-900 flex flex-col items-center justify-center p-6 text-center text-white">
-        <AlertTriangle className="w-24 h-24 text-amber-500 mb-6 animate-bounce" />
-        <h2 className="text-4xl font-black mb-4 tracking-tight">OUT OF BOUNDS</h2>
-        <p className="text-stone-300 max-w-md text-xl mb-8">
-          You are currently <strong>{distance?.toFixed(2)} miles</strong> away. <br/><br/>
-          You are not allowed to use this application outside of the authorized {radiusMiles}-mile store radius.
-        </p>
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center text-slate-950">
+        <div className="surface-card max-w-lg p-8">
+          <AlertTriangle className="w-24 h-24 text-amber-500 mb-6 mx-auto" />
+          <h2 className="text-4xl font-semibold mb-4 tracking-tight">Out of bounds</h2>
+          <p className="text-slate-600 text-xl mb-2">
+            You are currently <strong>{distance?.toFixed(2)} miles</strong> away.
+          </p>
+          <p className="text-slate-500">
+            You are not allowed to use this application outside of the authorized {radiusMiles}-mile store radius.
+          </p>
+        </div>
       </div>
     );
   }

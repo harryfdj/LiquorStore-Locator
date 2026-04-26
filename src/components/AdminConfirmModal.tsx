@@ -30,12 +30,12 @@ export const AdminConfirmModal: React.FC<AdminConfirmModalProps> = ({
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm transition-opacity animate-in fade-in duration-300"
+        className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm transition-opacity animate-in fade-in duration-300"
         onClick={onClose}
       />
       
       {/* Modal Content */}
-      <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border border-stone-200 animate-in zoom-in-95 duration-200 ease-out">
+      <div className="surface-card relative w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 ease-out">
         
         {/* Header Decore */}
         <div className={`h-2 w-full ${isDanger ? 'bg-red-600' : 'bg-amber-500'}`} />
@@ -47,7 +47,7 @@ export const AdminConfirmModal: React.FC<AdminConfirmModalProps> = ({
             </div>
             <button 
               onClick={onClose}
-              className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-xl transition-colors"
+              className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -64,7 +64,7 @@ export const AdminConfirmModal: React.FC<AdminConfirmModalProps> = ({
             <button
               onClick={onClose}
               disabled={isLoading}
-              className="flex-1 px-6 py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-xl transition-all active:scale-95 disabled:opacity-50"
+              className="btn-secondary flex-1 px-6 py-3"
             >
               Cancel
             </button>
@@ -74,7 +74,7 @@ export const AdminConfirmModal: React.FC<AdminConfirmModalProps> = ({
               className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 text-white font-bold rounded-xl shadow-lg shadow-inner transition-all active:scale-95 disabled:opacity-50 ${
                 isDanger 
                   ? 'bg-red-600 hover:bg-red-700 shadow-red-200' 
-                  : 'bg-stone-900 hover:bg-stone-800 shadow-stone-200'
+                  : 'bg-slate-950 hover:bg-slate-800 shadow-slate-200'
               }`}
             >
               {isLoading ? (

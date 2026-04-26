@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Check, X, AlertCircle } from 'lucide-react';
 import { Product } from '../types';
 import { apiFetch, apiJson } from '../lib/api';
-import { proxyUrl } from './InventoryTab';
+import { proxyUrl } from '../lib/images';
 
 interface StockVerifyProps {
   searchQuery: string;
@@ -105,20 +105,21 @@ export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="bg-white rounded-2xl shadow-sm border border-stone-200 p-6 mb-6">
-        <h2 className="text-xl font-bold text-stone-800 mb-2">Stock Verify Mode</h2>
-        <p className="text-stone-500">Scan an item's UPC or search using the top bar to verify its stock level.</p>
+    <div className="max-w-3xl mx-auto">
+      <div className="surface-card p-6 mb-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Verification Workflow</p>
+        <h2 className="mt-2 text-2xl font-semibold text-slate-950">Stock Verify Mode</h2>
+        <p className="mt-2 text-slate-500">Scan an item's UPC or search using the top bar to verify its stock level.</p>
         
         {error && (
-          <div className="mt-4 p-4 bg-red-50 text-red-700 rounded-xl flex items-center gap-2">
+          <div className="mt-4 p-4 bg-red-50 text-red-700 rounded-2xl flex items-center gap-2 border border-red-100">
             <AlertCircle className="w-5 h-5" />
             {error}
           </div>
         )}
         
         {successMessage && !product && (
-          <div className="mt-4 p-4 bg-emerald-50 text-emerald-700 rounded-xl flex items-center gap-2">
+          <div className="mt-4 p-4 bg-lime-50 text-lime-800 rounded-2xl flex items-center gap-2 border border-lime-100">
             <Check className="w-5 h-5" />
             {successMessage}
           </div>
@@ -126,8 +127,8 @@ export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
       </div>
 
       {candidates.length > 0 && !product && (
-        <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden mb-6">
-          <div className="p-6 border-b border-stone-100 bg-amber-50">
+        <div className="surface-card overflow-hidden mb-6">
+          <div className="p-6 border-b border-amber-100 bg-amber-50">
              <div className="flex items-center gap-3 text-amber-800">
                <AlertCircle className="w-6 h-6" />
                <h3 className="text-xl font-bold">Multiple Matches Found</h3>
@@ -136,19 +137,19 @@ export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
           </div>
           <div className="divide-y divide-stone-100">
             {candidates.map(candidate => (
-              <div key={candidate.sku} className="p-4 flex items-center gap-4 hover:bg-stone-50 transition-colors">
+              <div key={candidate.sku} className="p-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
                  {candidate.image_url ? (
-                   <img src={proxyUrl(candidate.image_url)} alt={candidate.name} className="w-16 h-16 object-contain rounded-lg bg-white border border-stone-100 p-1" />
+                   <img src={proxyUrl(candidate.image_url)} alt={candidate.name} className="w-16 h-16 object-contain rounded-2xl bg-white border border-slate-100 p-1" />
                  ) : (
-                   <div className="w-16 h-16 bg-stone-100 rounded-lg border border-stone-200 flex items-center justify-center">
-                     <span className="text-stone-400 text-xs">No Img</span>
+                   <div className="w-16 h-16 bg-slate-100 rounded-2xl border border-slate-200 flex items-center justify-center">
+                     <span className="text-slate-400 text-xs">No Img</span>
                    </div>
                  )}
                  <div className="flex-1">
-                    <h4 className="font-bold text-stone-800">{candidate.name}</h4>
-                    <div className="text-sm text-stone-500 mt-1 flex gap-4">
-                       <p>UPC: <span className="font-mono text-stone-700">{candidate.mainupc || 'N/A'}</span></p>
-                       <p>SKU: <span className="font-mono text-stone-700">{candidate.sku}</span></p>
+                    <h4 className="font-semibold text-slate-950">{candidate.name}</h4>
+                    <div className="text-sm text-slate-500 mt-1 flex gap-4">
+                       <p>UPC: <span className="font-mono text-slate-700">{candidate.mainupc || 'N/A'}</span></p>
+                       <p>SKU: <span className="font-mono text-slate-700">{candidate.sku}</span></p>
                     </div>
                     <p className="text-emerald-700 font-bold mt-1">${candidate.price != null ? candidate.price.toFixed(2) : '0.00'}</p>
                  </div>
@@ -157,7 +158,7 @@ export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
                      setProduct(candidate);
                      setCandidates([]);
                    }}
-                   className="px-6 py-2 bg-stone-800 text-white rounded-xl font-bold hover:bg-stone-900 transition-colors"
+                 className="btn-primary px-6 py-2"
                  >
                    Select
                  </button>
@@ -168,41 +169,41 @@ export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
       )}
 
       {product && (
-        <div className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
+        <div className="surface-card overflow-hidden">
           <div className="p-6">
-            <div className="flex gap-6">
+            <div className="flex flex-col sm:flex-row gap-6">
               {product.image_url ? (
-                <img src={proxyUrl(product.image_url)} alt={product.name} className="w-32 h-32 object-contain rounded-lg bg-stone-50 border border-stone-100 p-2" />
+                <img src={proxyUrl(product.image_url)} alt={product.name} className="w-32 h-32 object-contain rounded-3xl bg-slate-50 border border-slate-100 p-2" />
               ) : (
-                <div className="w-32 h-32 bg-stone-50 rounded-lg border border-stone-100 flex items-center justify-center">
-                  <span className="text-stone-400 text-sm">No Image</span>
+                <div className="w-32 h-32 bg-slate-50 rounded-3xl border border-slate-100 flex items-center justify-center">
+                  <span className="text-slate-400 text-sm">No Image</span>
                 </div>
               )}
               
               <div className="flex-1">
-                <h3 className="text-2xl font-bold text-stone-800 mb-2">{product.name}</h3>
-                <div className="text-stone-500 space-y-1 mb-6">
+                <h3 className="text-2xl font-semibold text-slate-950 mb-2">{product.name}</h3>
+                <div className="text-slate-500 space-y-1 mb-6">
                   <div className="flex flex-wrap gap-4 mb-3">
-                    <p className="text-lg text-stone-600 bg-emerald-50 text-emerald-800 px-3 py-1 rounded-lg border border-emerald-100">
+                    <p className="text-base bg-lime-50 text-lime-800 px-3 py-1 rounded-full border border-lime-100">
                       Retail: <span className="font-bold">${product.price != null ? product.price.toFixed(2) : '0.00'}</span>
                     </p>
-                    <p className="text-lg text-stone-600 bg-sky-50 text-sky-800 px-3 py-1 rounded-lg border border-sky-100">
+                    <p className="text-base bg-sky-50 text-sky-800 px-3 py-1 rounded-full border border-sky-100">
                       Cost: <span className="font-bold">${product.cost != null ? product.cost.toFixed(2) : '0.00'}</span>
                     </p>
                     {product.price != null && product.cost != null && product.cost > 0 && (
-                      <p className="text-lg text-stone-600 bg-purple-50 text-purple-800 px-3 py-1 rounded-lg border border-purple-100">
+                      <p className="text-base bg-indigo-50 text-indigo-800 px-3 py-1 rounded-full border border-indigo-100">
                         Margin: <span className="font-bold">{(((product.price - product.cost) / product.cost) * 100).toFixed(2)}%</span>
                       </p>
                     )}
                   </div>
-                  <p>UPC: <span className="font-mono text-stone-700">{product.mainupc || 'N/A'}</span></p>
-                  <p>SKU: <span className="font-mono text-stone-700">{product.sku}</span></p>
-                  <p>Location: <span className="font-medium text-stone-700">{product.location || 'None'}</span></p>
+                  <p>UPC: <span className="font-mono text-slate-700">{product.mainupc || 'N/A'}</span></p>
+                  <p>SKU: <span className="font-mono text-slate-700">{product.sku}</span></p>
+                  <p>Location: <span className="font-medium text-slate-700">{product.location || 'None'}</span></p>
                 </div>
                 
-                <div className="bg-stone-50 p-4 rounded-xl border border-stone-200 inline-block">
-                  <p className="text-sm text-stone-500 uppercase tracking-wider font-medium mb-1">System Stock</p>
-                  <p className="text-4xl font-bold text-stone-800">{product.stock ?? 0}</p>
+                <div className="bg-slate-50 p-4 rounded-3xl border border-slate-200 inline-block">
+                  <p className="text-sm text-slate-500 uppercase tracking-wider font-medium mb-1">System Stock</p>
+                  <p className="text-4xl font-semibold text-slate-950">{product.stock ?? 0}</p>
                 </div>
               </div>
             </div>
@@ -226,7 +227,7 @@ export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
                          setActualStock(product.existing_verification.actual_stock);
                       }
                     }} 
-                    className="w-full bg-amber-600 text-white py-3 justify-center rounded-xl font-bold flex items-center gap-2 hover:bg-amber-700 transition"
+                    className="w-full bg-amber-600 text-white py-3 justify-center rounded-2xl font-semibold flex items-center gap-2 hover:bg-amber-700 transition"
                   >
                     Change Verification?
                   </button>
@@ -235,10 +236,10 @@ export function StockVerify({ searchQuery, setSearchQuery }: StockVerifyProps) {
                 <div>
                   <p className="text-center text-stone-600 mb-4 font-medium text-lg">Does the rack have exactly {product.stock ?? 0} items?</p>
                   <div className="flex gap-4">
-                    <button onClick={handleMatch} className="flex-1 bg-emerald-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 shadow-sm hover:shadow">
+                    <button onClick={handleMatch} className="flex-1 bg-lime-300 text-slate-950 py-4 rounded-2xl font-semibold text-lg hover:bg-lime-200 transition-colors flex items-center justify-center gap-2 shadow-sm hover:shadow">
                       <Check className="w-6 h-6" /> Yes, Match
                     </button>
-                    <button onClick={() => setIsMismatched(true)} className="flex-1 bg-red-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2 shadow-sm hover:shadow">
+                    <button onClick={() => setIsMismatched(true)} className="flex-1 bg-red-600 text-white py-4 rounded-2xl font-semibold text-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2 shadow-sm hover:shadow">
                       <X className="w-6 h-6" /> No, Mismatch
                     </button>
                   </div>

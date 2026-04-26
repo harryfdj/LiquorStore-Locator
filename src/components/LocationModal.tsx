@@ -62,11 +62,11 @@ export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose, s
   };
 
   return (
-    <div className="fixed inset-0 bg-stone-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-stone-200 flex flex-col max-h-[90vh]">
-        <div className="p-5 border-b border-stone-200 bg-stone-50 flex items-center justify-between shrink-0">
+    <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+      <div className="surface-card w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 text-blue-700 rounded-lg">
+            <div className="p-2 bg-lime-100 text-slate-950 rounded-2xl">
               <MapPin className="w-5 h-5" />
             </div>
             <div>
@@ -95,7 +95,7 @@ export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose, s
                 step="any"
                 value={lat}
                 onChange={e => setLat(e.target.value)}
-                className="w-full bg-stone-50 border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                className="control-input w-full px-3 py-2 text-sm font-mono"
                 placeholder="e.g. 40.7128"
               />
             </div>
@@ -106,7 +106,7 @@ export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose, s
                 step="any"
                 value={lng}
                 onChange={e => setLng(e.target.value)}
-                className="w-full bg-stone-50 border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                className="control-input w-full px-3 py-2 text-sm font-mono"
                 placeholder="e.g. -74.0060"
               />
             </div>
@@ -117,7 +117,7 @@ export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose, s
                 step="any"
                 value={radiusMiles}
                 onChange={e => setRadiusMiles(e.target.value)}
-                className="w-full bg-stone-50 border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                className="control-input w-full px-3 py-2 text-sm font-mono"
                 placeholder="e.g. 0.5"
               />
             </div>
@@ -127,17 +127,17 @@ export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose, s
           </p>
         </div>
 
-        <div className="p-5 border-t border-stone-200 bg-stone-50 flex gap-3 justify-end shrink-0">
+        <div className="p-5 border-t border-slate-200 bg-slate-50 flex gap-3 justify-end shrink-0">
           <button 
             onClick={onClose}
-            className="px-4 py-2 font-semibold text-stone-600 hover:bg-stone-200 bg-stone-100 rounded-xl transition-colors text-sm"
+            className="btn-secondary px-4 py-2 text-sm"
           >
             Cancel
           </button>
           <button 
             onClick={handleSave}
             disabled={loading}
-            className="flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-xl shadow-sm transition-colors text-sm"
+            className="btn-primary flex items-center gap-2 px-6 py-2 text-sm"
           >
             {loading ? 'Saving...' : <><Save className="w-4 h-4" /> Save Security Boundaries</>}
           </button>

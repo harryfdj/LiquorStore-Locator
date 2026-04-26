@@ -118,70 +118,86 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
   };
 
   return (
-    <div className="min-h-screen bg-stone-100 text-stone-900 font-sans pb-12">
-      <header className="bg-stone-900 flex items-center justify-between p-4 shadow-md sticky top-0 z-20 text-white border-b-4 border-emerald-500">
+    <div className="min-h-screen text-slate-950 font-sans pb-12">
+      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-slate-200 bg-white/85 p-4 text-slate-950 shadow-sm shadow-slate-200/60 backdrop-blur-xl">
         <div className="flex items-center gap-3">
-          <Shield className="w-8 h-8 text-emerald-400" />
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-lime-300 text-slate-950">
+            <Shield className="w-6 h-6" />
+          </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight">Master Admin Dashboard</h1>
-            <p className="text-xs text-stone-400">Manage stores, Supabase data, and access controls</p>
+            <h1 className="text-xl font-semibold tracking-tight">Master Admin Dashboard</h1>
+            <p className="text-xs text-slate-500">Manage stores, Supabase data, and access controls</p>
           </div>
         </div>
         <button 
           onClick={onLogout}
-          className="bg-stone-800 hover:bg-stone-700 text-stone-200 px-4 py-2 rounded-xl text-sm font-semibold transition-colors flex items-center gap-2"
+          className="btn-secondary flex items-center gap-2 px-4 py-2 text-sm"
         >
           Logout <LogOut className="w-4 h-4" />
         </button>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 mt-8 flex flex-col gap-6">
+      <main className="max-w-6xl mx-auto px-4 mt-8 flex flex-col gap-6">
+        <section className="grid gap-4 md:grid-cols-3">
+          <div className="surface-card p-6 md:col-span-2">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-lime-700">Operations</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Store administration</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+              Create locations, maintain CSV mappings, configure geofence limits, and manage tenant data from one clean control center.
+            </p>
+          </div>
+          <div className="surface-card p-6">
+            <p className="text-sm font-medium text-slate-500">Active Stores</p>
+            <p className="mt-3 text-5xl font-semibold tracking-tight text-slate-950">{stores.length}</p>
+            <p className="mt-2 text-sm text-slate-500">Supabase tenants configured</p>
+          </div>
+        </section>
         
         {/* Create Store Flow */}
-        <section className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
-          <div className="p-5 bg-gradient-to-r from-emerald-50 to-white border-b border-stone-200">
-            <h2 className="text-lg font-bold text-stone-800 flex items-center gap-2">
-              <Plus className="w-5 h-5 text-emerald-600" /> Create Store Account
+        <section className="surface-card overflow-hidden">
+          <div className="p-5 bg-slate-50/80 border-b border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-950 flex items-center gap-2">
+              <Plus className="w-5 h-5 text-lime-700" /> Create Store Account
             </h2>
-            <p className="text-sm text-stone-500 mt-1">
+            <p className="text-sm text-slate-500 mt-1">
               Creates a new store tenant in Supabase with securely hashed staff credentials.
             </p>
           </div>
           
           <div className="p-6">
-            {error && <div className="mb-4 text-sm font-medium text-red-700 bg-red-50 px-4 py-3 rounded-xl border border-red-200">{error}</div>}
-            {successMsg && <div className="mb-4 text-sm font-medium text-emerald-700 bg-emerald-50 px-4 py-3 rounded-xl border border-emerald-200 flex items-center gap-2"><Check className="w-5 h-5"/> {successMsg}</div>}
+            {error && <div className="mb-4 text-sm font-medium text-red-700 bg-red-50 px-4 py-3 rounded-2xl border border-red-200">{error}</div>}
+            {successMsg && <div className="mb-4 text-sm font-medium text-lime-800 bg-lime-50 px-4 py-3 rounded-2xl border border-lime-200 flex items-center gap-2"><Check className="w-5 h-5"/> {successMsg}</div>}
 
             <form onSubmit={handleCreateStore} className="flex flex-col sm:flex-row gap-4 items-end">
               <div className="flex-1 w-full">
-                <label className="text-sm font-bold text-stone-600 block mb-1.5 ml-1">Store Name</label>
+                <label className="text-sm font-semibold text-slate-700 block mb-1.5 ml-1">Store Name</label>
                 <div className="relative">
-                  <Store className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+                  <Store className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     type="text"
                     value={newStoreName}
                     onChange={e => setNewStoreName(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 bg-stone-50 border border-stone-300 rounded-xl text-stone-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-shadow"
+                    className="control-input w-full py-3 pl-11 pr-4"
                     placeholder="e.g. HillTop Store 1"
                   />
                 </div>
               </div>
               <div className="flex-1 w-full">
-                <label className="text-sm font-bold text-stone-600 block mb-1.5 ml-1">Temporary Staff Password</label>
+                <label className="text-sm font-semibold text-slate-700 block mb-1.5 ml-1">Temporary Staff Password</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     type="password"
                     value={newStorePassword}
                     onChange={e => setNewStorePassword(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 bg-stone-50 border border-stone-300 rounded-xl text-stone-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-shadow font-mono text-sm"
+                    className="control-input w-full py-3 pl-11 pr-4 font-mono text-sm"
                     placeholder="e.g. secret-pwd"
                   />
                 </div>
               </div>
               <button
                 type="submit"
-                className="w-full sm:w-auto mt-2 sm:mt-0 px-6 py-2.5 bg-stone-900 border-2 border-stone-900 hover:bg-stone-800 text-white font-bold rounded-xl shadow-md transition-all active:scale-95 whitespace-nowrap"
+                className="btn-primary w-full sm:w-auto mt-2 sm:mt-0 px-6 py-3 whitespace-nowrap"
               >
                 Create Store
               </button>
@@ -190,17 +206,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
         </section>
 
         {/* Store List */}
-        <section className="bg-white rounded-2xl shadow-sm border border-stone-200">
-          <div className="p-5 border-b border-stone-200 flex justify-between items-center bg-stone-50 rounded-t-2xl">
-            <h2 className="text-lg font-bold text-stone-800 flex items-center gap-2">
-              <Package className="w-5 h-5 text-stone-500" /> Active Stores
+        <section className="surface-card">
+          <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50/80 rounded-t-3xl">
+            <h2 className="text-lg font-semibold text-slate-950 flex items-center gap-2">
+              <Package className="w-5 h-5 text-slate-500" /> Active Stores
             </h2>
-            <span className="bg-stone-200 text-stone-600 px-3 py-1 rounded-full text-xs font-bold leading-none select-none">
+            <span className="status-chip border-lime-200 bg-lime-50 text-lime-800">
               {stores.length} ACTIVE
             </span>
           </div>
 
-          <div className="divide-y divide-stone-100">
+          <div className="divide-y divide-slate-100">
             {loading ? (
               <div className="p-8 text-center text-stone-400 font-medium">Fetching databases...</div>
             ) : stores.length === 0 ? (
@@ -211,16 +227,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
               </div>
             ) : (
               stores.map(store => (
-                <div key={store.id} className="p-4 sm:p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:bg-stone-50/50 transition-colors">
+                <div key={store.id} className="p-4 sm:p-5 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 hover:bg-slate-50/70 transition-colors">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-xl flex items-center justify-center font-bold text-xl shadow-inner border border-emerald-200 shrink-0 select-none">
-                      {store.id}
+                    <div className="w-12 h-12 bg-lime-200 text-slate-950 rounded-2xl flex items-center justify-center font-semibold text-lg shadow-inner border border-lime-300 shrink-0 select-none">
+                      {store.name.slice(0, 1).toUpperCase()}
                     </div>
                     <div>
-                      <h3 className="font-bold text-lg tracking-tight leading-tight">{store.name}</h3>
-                      <div className="flex items-center gap-3 mt-1 text-xs font-mono text-stone-500">
-                        <span className="flex items-center gap-1"><Lock className="w-3 h-3 text-stone-400" /> Code: {store.code}</span>
-                        <span className="text-stone-300">•</span>
+                      <h3 className="font-semibold text-lg tracking-tight leading-tight text-slate-950">{store.name}</h3>
+                      <div className="flex items-center gap-3 mt-1 text-xs font-mono text-slate-500">
+                        <span className="flex items-center gap-1"><Lock className="w-3 h-3 text-slate-400" /> Code: {store.code}</span>
+                        <span className="text-slate-300">•</span>
                         <span>Supabase tenant</span>
                       </div>
                     </div>
@@ -228,25 +244,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ token, onLogout 
                   <div className="flex flex-wrap items-center gap-2 mt-3 sm:mt-0 sl:ml-auto">
                     <button
                       onClick={() => setLocationModalConfig({ isOpen: true, store })}
-                      className="p-2 sm:px-4 sm:py-2 text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-xl transition-colors font-semibold text-sm border border-stone-200 flex items-center gap-2"
+                      className="btn-secondary p-2 sm:px-4 sm:py-2 text-sm flex items-center gap-2"
                     >
                       <MapPin className="w-4 h-4" /> <span className="hidden sm:inline">Location GeoFence</span>
                     </button>
                     <button
                       onClick={() => setMappingModalConfig({ isOpen: true, store })}
-                      className="p-2 sm:px-4 sm:py-2 text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-xl transition-colors font-semibold text-sm border border-stone-200 flex items-center gap-2"
+                      className="btn-secondary p-2 sm:px-4 sm:py-2 text-sm flex items-center gap-2"
                     >
                       <Settings className="w-4 h-4" /> <span className="hidden sm:inline">CSV Settings</span>
                     </button>
                     <button
                       onClick={() => openConfirmModal(store, 'clear')}
-                      className="p-2 sm:px-4 sm:py-2 text-stone-600 bg-stone-100 hover:bg-stone-200 rounded-xl transition-colors font-semibold text-sm border border-stone-200 flex items-center gap-2"
+                      className="btn-secondary p-2 sm:px-4 sm:py-2 text-sm flex items-center gap-2"
                     >
                       <Trash2 className="w-4 h-4" /> <span className="hidden sm:inline">Clear Data</span>
                     </button>
                     <button
                       onClick={() => openConfirmModal(store, 'delete')}
-                      className="p-2 sm:px-4 sm:py-2 text-red-600 bg-red-50 hover:bg-red-600 hover:text-white rounded-xl transition-colors font-semibold text-sm border border-red-200 flex items-center gap-2"
+                      className="p-2 sm:px-4 sm:py-2 text-red-600 bg-red-50 hover:bg-red-600 hover:text-white rounded-2xl transition-colors font-semibold text-sm border border-red-200 flex items-center gap-2"
                     >
                       <Trash2 className="w-4 h-4" /> <span className="hidden sm:inline">Delete Tenant</span>
                     </button>

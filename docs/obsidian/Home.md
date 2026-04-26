@@ -16,6 +16,7 @@ This folder is an Obsidian vault for project memory. Open `docs/obsidian` as a v
 - [[API Map]]
 - [[GCP MCP]]
 - [[Production Roadmap]]
+- [[UI Style Guide]]
 - [[Feature Backlog]]
 - [[Decision Log]]
 - [[Session Notes]]
@@ -30,6 +31,7 @@ The app is a Vite React frontend served by an Express backend. The backend uses 
 - Keep API behavior in [[API Map]].
 - Keep cloud and MCP setup notes in [[GCP MCP]].
 - Keep planned production work in [[Production Roadmap]].
+- Keep visual design conventions in [[UI Style Guide]].
 - Keep feature ideas and improvements in [[Feature Backlog]].
 - Keep durable technical decisions in [[Decision Log]].
 - Add short work summaries to [[Session Notes]] after meaningful changes.
