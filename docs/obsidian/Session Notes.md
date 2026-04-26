@@ -14,6 +14,7 @@ Add short notes after meaningful work. Newest entries go first.
 
 - Made scanner output and product UPC lookup tolerate the common scanner case where UPC-A is reported with one extra leading zero.
 - Re-centered the camera scanner modal with dynamic viewport sizing for phone and laptop screens.
+- Restored the scanner runtime to the reliable `html5-qrcode` path on phones and made the scan box responsive on narrow screens.
 
 ## 2026-04-26: Bulk inventory location mode
 

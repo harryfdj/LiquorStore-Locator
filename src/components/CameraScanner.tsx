@@ -9,22 +9,7 @@ interface CameraScannerProps {
   buttonClassName?: string;
 }
 
-type ScannerEngine = 'native' | 'fallback' | null;
-
-type NativeBarcodeDetector = {
-  detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue?: string }>>;
-};
-
-const NATIVE_BARCODE_FORMATS = [
-  'ean_13',
-  'ean_8',
-  'upc_a',
-  'upc_e',
-  'code_128',
-  'code_39',
-  'code_93',
-  'itf',
-] as const;
+type ScannerEngine = 'fallback' | null;
 
 const HTML5_BARCODE_FORMATS = [
   Html5QrcodeSupportedFormats.EAN_13,
@@ -36,12 +21,6 @@ const HTML5_BARCODE_FORMATS = [
   Html5QrcodeSupportedFormats.CODE_93,
   Html5QrcodeSupportedFormats.ITF,
 ];
-
-function getNativeBarcodeDetector() {
-  return (window as any).BarcodeDetector as
-    | (new (options?: { formats?: readonly string[] }) => NativeBarcodeDetector)
-    | undefined;
-}
 
 function normalizeScannedBarcode(decodedText: string) {
   const value = decodedText.trim();
@@ -62,10 +41,6 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
   const [showZoom, setShowZoom] = useState(false);
   const [scannerEngine, setScannerEngine] = useState<ScannerEngine>(null);
   const scannerInstanceRef = useRef<Html5Qrcode | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const nativeStreamRef = useRef<MediaStream | null>(null);
-  const nativeFrameRef = useRef<number | null>(null);
-  const lastNativeDetectRef = useRef(0);
   const lastScanRef = useRef<{ text: string; time: number }>({ text: '', time: 0 });
   const onScanRef = useRef(onScan);
   const readerId = useRef(`reader-${Math.random().toString(36).substring(2, 9)}`).current;
@@ -77,13 +52,8 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
     const track = stream.getVideoTracks()[0];
 
     if (track?.applyConstraints) {
-      track.applyConstraints({ advanced: [{ zoom: newZoom } as any] }).catch(() => {
-        videoEl.style.transform = `scale(${newZoom})`;
-        videoEl.style.transformOrigin = 'center center';
-      });
-      return;
+      track.applyConstraints({ advanced: [{ zoom: newZoom } as any] }).catch(() => {});
     }
-
     videoEl.style.transform = `scale(${newZoom})`;
     videoEl.style.transformOrigin = 'center center';
   }, []);
@@ -93,7 +63,7 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
     setZoom(newZoom);
 
     try {
-      const videoEl = videoRef.current || document.querySelector(`#${readerId} video`) as HTMLVideoElement;
+      const videoEl = document.querySelector(`#${readerId} video`) as HTMLVideoElement;
       applyZoomToVideo(videoEl, newZoom);
     } catch (err) {
       console.error("Zoom error", err);
@@ -184,71 +154,6 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
     setShowZoom(hasNativeZoom || Boolean(videoEl));
   }, [applyZoomToVideo]);
 
-  const stopNativeScanner = useCallback(() => {
-    if (nativeFrameRef.current !== null) {
-      window.cancelAnimationFrame(nativeFrameRef.current);
-      nativeFrameRef.current = null;
-    }
-
-    nativeStreamRef.current?.getTracks().forEach(track => track.stop());
-    nativeStreamRef.current = null;
-
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-  }, []);
-
-  const startNativeScanner = useCallback(async () => {
-    const BarcodeDetector = getNativeBarcodeDetector();
-    const videoEl = videoRef.current;
-
-    if (!BarcodeDetector || !navigator.mediaDevices?.getUserMedia || !videoEl) {
-      return false;
-    }
-
-    const detector = new BarcodeDetector({ formats: NATIVE_BARCODE_FORMATS });
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: {
-        facingMode: { ideal: 'environment' },
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-      },
-    });
-
-    nativeStreamRef.current = stream;
-    videoEl.srcObject = stream;
-    videoEl.setAttribute('playsinline', 'true');
-    await videoEl.play();
-
-    setScannerEngine('native');
-    configureCameraTrack(videoEl);
-
-    const detectLoop = async (timestamp: number) => {
-      if (!nativeStreamRef.current || !videoRef.current) return;
-
-      // Native detection is fast, but throttling avoids burning battery and keeps the UI smooth.
-      if (timestamp - lastNativeDetectRef.current >= 80) {
-        lastNativeDetectRef.current = timestamp;
-        try {
-          const barcodes = await detector.detect(videoRef.current);
-          const decodedText = barcodes.find(barcode => barcode.rawValue)?.rawValue;
-          if (decodedText) {
-            handleDecodedText(decodedText);
-            return;
-          }
-        } catch {
-          // Detection errors are expected while frames are blurry or still loading.
-        }
-      }
-
-      nativeFrameRef.current = window.requestAnimationFrame(detectLoop);
-    };
-
-    nativeFrameRef.current = window.requestAnimationFrame(detectLoop);
-    return true;
-  }, [configureCameraTrack, handleDecodedText]);
-
   useEffect(() => {
     let isMounted = true;
     let html5QrCode: Html5Qrcode | null = null;
@@ -275,7 +180,10 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
           { facingMode: "environment" },
           {
             fps: 24,
-            qrbox: { width: 320, height: 140 },
+            qrbox: (viewfinderWidth, viewfinderHeight) => ({
+              width: Math.max(160, Math.min(320, viewfinderWidth - 24)),
+              height: Math.max(80, Math.min(140, viewfinderHeight - 24)),
+            }),
             aspectRatio: 1.777778,
           },
           handleDecodedText,
@@ -294,20 +202,11 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
         });
       };
 
-      startNativeScanner()
-        .then(started => {
-          if (!started) startFallbackScanner();
-        })
-        .catch(err => {
-          console.warn("Native barcode scanner unavailable, using fallback scanner.", err);
-          stopNativeScanner();
-          startFallbackScanner();
-        });
+      startFallbackScanner();
     }
 
     return () => {
       isMounted = false;
-      stopNativeScanner();
       if (html5QrCode && startPromise) {
         // Wait for start to finish before stopping to prevent transition errors
         startPromise.then(() => {
@@ -323,7 +222,7 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
         });
       }
     };
-  }, [configureCameraTrack, handleDecodedText, isScanning, readerId, setIsScanning, startNativeScanner, stopNativeScanner]);
+  }, [configureCameraTrack, handleDecodedText, isScanning, readerId, setIsScanning]);
 
   return (
     <div className="flex items-center gap-2 relative">
@@ -361,12 +260,6 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
           </div>
           <div className="flex justify-center overflow-hidden bg-black p-4">
             <div className="relative aspect-[4/3] w-full max-w-[340px] overflow-hidden rounded-xl bg-black">
-              <video
-                ref={videoRef}
-                muted
-                playsInline
-                className={`absolute inset-0 h-full w-full object-cover ${scannerEngine === 'native' ? 'block' : 'hidden'}`}
-              />
               <div
                 id={readerId}
                 className={`min-h-[255px] w-full ${scannerEngine === 'fallback' ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
@@ -392,7 +285,7 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
           )}
 
           <div className="p-4 text-center text-sm text-stone-500 bg-stone-50">
-            Align the UPC horizontally inside the green box. Native scanning is used first when your device supports it.
+            Align the UPC horizontally inside the green box. Use the zoom slider if the barcode is small.
           </div>
         </div>
       </div>
