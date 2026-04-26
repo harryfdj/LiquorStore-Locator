@@ -182,6 +182,8 @@ function StoreApp({ user, onLogout }: { user: AuthUser, onLogout: () => void }) 
               <InventoryTab
                 products={inventory.products}
                 visibleCount={inventory.visibleCount}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
                 selectedDept={inventory.selectedDept}
                 setSelectedDept={inventory.setSelectedDept}
                 departments={inventory.departments}
@@ -192,6 +194,7 @@ function StoreApp({ user, onLogout }: { user: AuthUser, onLogout: () => void }) 
                 startEditing={inventory.startEditing}
                 cancelEditing={inventory.cancelEditing}
                 saveEdits={inventory.saveEdits}
+                updateProductLocation={inventory.updateProductLocation}
                 openImageSelector={inventory.openImageSelector}
               />
             </>

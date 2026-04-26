@@ -194,6 +194,17 @@ export function useInventory(searchQuery: string) {
     }
   };
 
+  const updateProductLocation = async (sku: string, location: string) => {
+    await apiFetch(`/api/products/${sku}`, {
+      method: 'PUT',
+      body: JSON.stringify({ location }),
+    });
+
+    setProducts(prev => prev.map(product =>
+      product.sku === sku ? { ...product, location } : product
+    ));
+  };
+
   const openImageSelector = async (sku: string) => {
     setImageSelectorSku(sku);
     setIsLoadingCandidates(true);
@@ -236,7 +247,7 @@ export function useInventory(searchQuery: string) {
     fileInputRef, handleFileUpload,
     stopFetchImages, batchFetchImages,
     editingSku, editLocation, setEditLocation, editImageUrl, setEditImageUrl, editAltUpcs, setEditAltUpcs,
-    startEditing, cancelEditing, saveEdits,
+    startEditing, cancelEditing, saveEdits, updateProductLocation,
     imageSelectorSku, setImageSelectorSku, imageCandidates, isLoadingCandidates,
     openImageSelector, selectImage,
     visibleCount, showAdminPanel, setShowAdminPanel

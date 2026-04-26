@@ -10,6 +10,11 @@ status: active
 
 Add short notes after meaningful work. Newest entries go first.
 
+## 2026-04-26: Bulk inventory location mode
+
+- Added inventory **Bulk Location Mode**: enter active shelf code, scan UPCs, and apply that location to products without opening each item edit panel.
+- If scanned products already have one or more locations, the UI asks whether to replace a specific existing location or add the active location as another location.
+
 ## 2026-04-26: Delete Alabama order import
 
 - Added `DELETE /api/orders/:id` for non-finalized orders (lines removed via FK cascade).
