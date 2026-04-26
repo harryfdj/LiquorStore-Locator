@@ -27,14 +27,15 @@ export const ImageSelectorModal: React.FC<ImageSelectorModalProps> = ({
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div role="dialog" aria-modal="true" aria-label="Select product image" className="surface-card p-6 max-w-5xl w-full shadow-2xl max-h-[90vh] flex flex-col">
-        <div className="flex justify-between items-center mb-4 sticky top-0 bg-white z-10">
+        <div className="mb-5 flex items-start justify-between gap-4 border-b border-slate-200 pb-4">
           <div>
-            <h2 className="text-xl font-bold">Select Better Image</h2>
-            <p className="text-sm text-stone-500 mt-1">
-              Searching for: <span className="font-semibold text-stone-700">{products.find(p => p.sku === imageSelectorSku)?.name}</span>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Image Library</p>
+            <h2 className="mt-1 text-xl font-semibold text-slate-950">Select Better Image</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Searching for: <span className="font-semibold text-slate-700">{products.find(p => p.sku === imageSelectorSku)?.name}</span>
             </p>
           </div>
-          <button onClick={() => setImageSelectorSku(null)} className="text-stone-400 hover:text-stone-600">
+          <button onClick={() => setImageSelectorSku(null)} className="rounded-2xl p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700">
             <X className="w-6 h-6" />
           </button>
         </div>

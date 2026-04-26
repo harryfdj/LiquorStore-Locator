@@ -12,19 +12,37 @@ import { downloadImageToStorage, searchImages, scoreImageMatch } from '../servic
 const router = express.Router();
 router.use(requireAuth);
 const upload = multer({ dest: os.tmpdir() });
+const PRODUCT_PAGE_SIZE = 1000;
 
 function normalizeCode(value: string) {
   return value.trim();
 }
 
-async function productsForStore(storeId: string) {
-  const { data, error } = await supabaseAdmin
-    .from('products')
-    .select('*')
-    .eq('store_id', storeId);
+async function productsForStore(storeId: string, department = '') {
+  const products: ProductRow[] = [];
+  let from = 0;
 
-  if (error) throw error;
-  return (data || []) as ProductRow[];
+  while (true) {
+    let query = supabaseAdmin
+      .from('products')
+      .select('*')
+      .eq('store_id', storeId)
+      .order('name', { ascending: true })
+      .range(from, from + PRODUCT_PAGE_SIZE - 1);
+
+    if (department) query = query.eq('depname', department);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const page = (data || []) as ProductRow[];
+    products.push(...page);
+
+    if (page.length < PRODUCT_PAGE_SIZE) break;
+    from += PRODUCT_PAGE_SIZE;
+  }
+
+  return products;
 }
 
 function withExistingVerification(product: ProductRow, verifications: Map<string, any>) {
@@ -99,18 +117,7 @@ router.get('/', async (req, res) => {
     const search = String(req.query.q || '').trim();
     const department = String(req.query.dept || '').trim();
 
-    let query = supabaseAdmin
-      .from('products')
-      .select('*')
-      .eq('store_id', storeId)
-      .order('name', { ascending: true });
-
-    if (department) query = query.eq('depname', department);
-
-    const { data, error } = await query;
-    if (error) throw error;
-
-    const products = ((data || []) as ProductRow[])
+    const products = (await productsForStore(storeId, department))
       .filter(product => {
         if (!search) return true;
         const haystack = [
@@ -314,13 +321,8 @@ router.post('/upload', upload.single('file'), async (req, res) => {
           return undefined;
         };
 
-        const { data: existingRows, error: existingError } = await supabaseAdmin
-          .from('products')
-          .select('*')
-          .eq('store_id', storeId);
-        if (existingError) throw existingError;
-
-        const existingBySku = new Map(((existingRows || []) as ProductRow[]).map(row => [row.sku, row]));
+        const existingRows = await productsForStore(storeId);
+        const existingBySku = new Map(existingRows.map(row => [row.sku, row]));
 
         const rows: ProductRow[] = [];
         let skipped = 0;

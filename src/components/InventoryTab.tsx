@@ -78,7 +78,7 @@ export const InventoryTab: React.FC<InventoryTabProps> = ({
             <div className="absolute top-3 right-3">
               {product.location ? (
                 <div className="badge-location">
-                  <MapPin className="w-3.5 h-3.5" />
+                  <MapPin className="w-4 h-4" />
                   Rack {product.location}
                 </div>
               ) : (
