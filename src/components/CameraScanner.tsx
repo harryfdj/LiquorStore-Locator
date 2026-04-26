@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { Html5Qrcode } from 'html5-qrcode';
 import { Camera, CameraOff, AlertCircle, X, ZoomIn } from 'lucide-react';
 
 interface CameraScannerProps {
@@ -8,19 +8,6 @@ interface CameraScannerProps {
   setIsScanning: (val: boolean) => void;
   buttonClassName?: string;
 }
-
-type ScannerEngine = 'fallback' | null;
-
-const HTML5_BARCODE_FORMATS = [
-  Html5QrcodeSupportedFormats.EAN_13,
-  Html5QrcodeSupportedFormats.EAN_8,
-  Html5QrcodeSupportedFormats.UPC_A,
-  Html5QrcodeSupportedFormats.UPC_E,
-  Html5QrcodeSupportedFormats.CODE_128,
-  Html5QrcodeSupportedFormats.CODE_39,
-  Html5QrcodeSupportedFormats.CODE_93,
-  Html5QrcodeSupportedFormats.ITF,
-];
 
 function normalizeScannedBarcode(decodedText: string) {
   const value = decodedText.trim();
@@ -39,7 +26,6 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
   const [zoom, setZoom] = useState(1);
   const [zoomRange, setZoomRange] = useState({ min: 1, max: 5, step: 0.1 });
   const [showZoom, setShowZoom] = useState(false);
-  const [scannerEngine, setScannerEngine] = useState<ScannerEngine>(null);
   const scannerInstanceRef = useRef<Html5Qrcode | null>(null);
   const lastScanRef = useRef<{ text: string; time: number }>({ text: '', time: 0 });
   const onScanRef = useRef(onScan);
@@ -52,8 +38,14 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
     const track = stream.getVideoTracks()[0];
 
     if (track?.applyConstraints) {
-      track.applyConstraints({ advanced: [{ zoom: newZoom } as any] }).catch(() => {});
+      track.applyConstraints({ advanced: [{ zoom: newZoom } as any] }).catch(err => {
+        console.error("Native zoom failed", err);
+        videoEl.style.transform = `scale(${newZoom})`;
+        videoEl.style.transformOrigin = 'center center';
+      });
+      return;
     }
+
     videoEl.style.transform = `scale(${newZoom})`;
     videoEl.style.transformOrigin = 'center center';
   }, []);
@@ -115,7 +107,7 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
     const track = stream.getVideoTracks()[0];
     if (!track) return;
 
-    let targetZoom = 1;
+    let targetZoom = 2;
     let hasNativeZoom = false;
 
     try {
@@ -131,19 +123,8 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
             step: capabilities.zoom.step || 0.1
           });
 
-          // 1D barcodes scan faster when the camera is a little zoomed, but too much zoom hurts laptops.
-          targetZoom = Math.max(min, Math.min(1.6, max));
+          targetZoom = Math.max(min, Math.min(2, max));
         }
-      }
-
-      if (track.applyConstraints) {
-        track.applyConstraints({
-          advanced: [
-            { focusMode: 'continuous' } as any,
-            { exposureMode: 'continuous' } as any,
-            { whiteBalanceMode: 'continuous' } as any,
-          ],
-        }).catch(() => {});
       }
     } catch (e) {
       console.error("Could not read camera capabilities", e);
@@ -162,16 +143,13 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
     if (isScanning) {
       setError('');
       setShowZoom(false);
-      setScannerEngine(null);
-      setZoom(1);
+      setZoom(2);
 
       const startFallbackScanner = () => {
         if (!isMounted) return;
 
-        setScannerEngine('fallback');
         html5QrCode = new Html5Qrcode(readerId, {
           verbose: false,
-          formatsToSupport: HTML5_BARCODE_FORMATS,
         });
 
         scannerInstanceRef.current = html5QrCode;
@@ -179,12 +157,8 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
         startPromise = html5QrCode.start(
           { facingMode: "environment" },
           {
-            fps: 24,
-            qrbox: (viewfinderWidth, viewfinderHeight) => ({
-              width: Math.max(160, Math.min(320, viewfinderWidth - 24)),
-              height: Math.max(80, Math.min(140, viewfinderHeight - 24)),
-            }),
-            aspectRatio: 1.777778,
+            fps: 30,
+            qrbox: { width: 280, height: 120 },
           },
           handleDecodedText,
           () => {}
@@ -192,7 +166,7 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
           setTimeout(() => {
             const videoEl = document.querySelector(`#${readerId} video`) as HTMLVideoElement;
             configureCameraTrack(videoEl);
-          }, 300);
+          }, 500);
         }).catch((err) => {
           if (isMounted) {
             console.error("Camera start error:", err);
@@ -259,13 +233,7 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
             </button>
           </div>
           <div className="flex justify-center overflow-hidden bg-black p-4">
-            <div className="relative aspect-[4/3] w-full max-w-[340px] overflow-hidden rounded-xl bg-black">
-              <div
-                id={readerId}
-                className={`min-h-[255px] w-full ${scannerEngine === 'fallback' ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
-              />
-              <div className="pointer-events-none absolute inset-x-6 top-1/2 h-28 -translate-y-1/2 rounded-2xl border-2 border-lime-300/90 shadow-[0_0_0_999px_rgba(0,0,0,0.25)]" />
-            </div>
+            <div id={readerId} className="w-full max-w-[300px] min-h-[300px] overflow-hidden rounded-xl bg-black"></div>
           </div>
           
           {showZoom && (
@@ -285,7 +253,7 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
           )}
 
           <div className="p-4 text-center text-sm text-stone-500 bg-stone-50">
-            Align the UPC horizontally inside the green box. Use the zoom slider if the barcode is small.
+            Align the barcode horizontally within the box. Good lighting helps with curved bottles!
           </div>
         </div>
       </div>
