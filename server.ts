@@ -7,6 +7,7 @@ import verificationsRoutes from './server/routes/verifications.routes';
 import proxyRoutes from './server/routes/proxy.routes';
 import authRoutes from './server/routes/auth.routes';
 import adminRoutes from './server/routes/admin.routes';
+import ordersRoutes from './server/routes/orders.routes';
 import { config } from './server/lib/config';
 
 async function startServer() {
@@ -21,6 +22,7 @@ async function startServer() {
   app.use('/api/admin', adminRoutes);
   app.use('/api/image-proxy', proxyRoutes);
   app.use('/api/products', inventoryRoutes);
+  app.use('/api/orders', ordersRoutes);
   app.use('/api/reports', reportsRoutes);
   app.use('/api/verifications', verificationsRoutes);
 

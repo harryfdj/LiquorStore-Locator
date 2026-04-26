@@ -1,11 +1,12 @@
 import React from 'react';
-import { Package, ClipboardCheck, FileText, Upload, X, Trash2, Image as ImageIcon } from 'lucide-react';
+import { Package, ClipboardCheck, FileText, Upload, X, Image as ImageIcon, Truck } from 'lucide-react';
+import { AppTab } from '../types';
 
 interface SidebarProps {
   isSidebarOpen: boolean;
   setIsSidebarOpen: (v: boolean) => void;
-  activeTab: 'inventory' | 'verify' | 'reports';
-  setActiveTab: (t: 'inventory' | 'verify' | 'reports') => void;
+  activeTab: AppTab;
+  setActiveTab: (t: AppTab) => void;
   isUploading: boolean;
   isFetchingImages: boolean;
   fetchProgress: { current: number; total: number; found: number };
@@ -65,6 +66,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className={`px-4 py-3 rounded-2xl text-left font-semibold transition-colors flex items-center gap-3 ${activeTab === 'reports' ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'}`}
             >
               <FileText className="w-5 h-5" /> Reports
+            </button>
+            <button
+              onClick={() => { setActiveTab('orders'); setIsSidebarOpen(false); }}
+              className={`px-4 py-3 rounded-2xl text-left font-semibold transition-colors flex items-center gap-3 ${activeTab === 'orders' ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'}`}
+            >
+              <Truck className="w-5 h-5" /> Orders
             </button>
           </div>
 

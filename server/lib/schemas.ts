@@ -35,3 +35,17 @@ export const verificationSchema = z.object({
   actual_stock: z.coerce.number().int().min(0),
   status: z.enum(['matched', 'mismatched']),
 });
+
+export const importOrderHtmlSchema = z.object({
+  html: z.string().min(100),
+});
+
+export const matchOrderLineSchema = z.object({
+  product_sku: z.string().trim().min(1),
+});
+
+export const verifyOrderLineSchema = z.object({
+  received_bottles: z.coerce.number().int().min(0),
+  final_rack_count: z.coerce.number().int().min(0),
+  notes: z.string().trim().max(1000).optional().default(''),
+});

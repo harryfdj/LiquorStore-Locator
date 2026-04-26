@@ -9,7 +9,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { GeoFence } from './components/GeoFence';
 import { LogOut } from 'lucide-react';
 import { apiJson, clearStoredSession } from './lib/api';
-import { AuthUser } from './types';
+import { AppTab, AuthUser } from './types';
 
 const StockVerify = lazy(() =>
   import('./components/StockVerify').then(module => ({ default: module.StockVerify })),
@@ -25,6 +25,9 @@ const ImageSelectorModal = lazy(() =>
 );
 const AdminDashboard = lazy(() =>
   import('./components/AdminDashboard').then(module => ({ default: module.AdminDashboard })),
+);
+const OrdersTab = lazy(() =>
+  import('./components/OrdersTab').then(module => ({ default: module.OrdersTab })),
 );
 
 export default function App() {
@@ -70,7 +73,7 @@ export default function App() {
 }
 
 function StoreApp({ user, onLogout }: { user: AuthUser, onLogout: () => void }) {
-  const [activeTab, setActiveTab] = useState<'inventory' | 'verify' | 'reports'>('inventory');
+  const [activeTab, setActiveTab] = useState<AppTab>('inventory');
   const [searchQuery, setSearchQuery] = useState('');
   const [isScanning, setIsScanning] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -139,6 +142,11 @@ function StoreApp({ user, onLogout }: { user: AuthUser, onLogout: () => void }) 
         {activeTab === 'reports' && (
           <Suspense fallback={<div className="text-center py-10 text-stone-500">Loading reports...</div>}>
             <VerificationReports />
+          </Suspense>
+        )}
+        {activeTab === 'orders' && (
+          <Suspense fallback={<div className="text-center py-10 text-stone-500">Loading orders...</div>}>
+            <OrdersTab searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
           </Suspense>
         )}
 

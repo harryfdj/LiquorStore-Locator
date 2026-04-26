@@ -63,3 +63,63 @@ export interface AuthUser {
   lng?: number | null;
   radius_miles?: number | null;
 }
+
+export type AppTab = 'inventory' | 'verify' | 'orders' | 'reports';
+
+export interface SupplierOrderSummary {
+  id: string;
+  document_no: string;
+  order_no: string;
+  shipping_method: string;
+  shipment_date: string | null;
+  order_date: string | null;
+  document_date: string | null;
+  location_code: string;
+  payment_status: string;
+  payment_method: string;
+  subtotal: number;
+  total: number;
+  status: 'draft' | 'in_progress' | 'finalized';
+  finalized_at: string | null;
+  created_at: string;
+  line_count: number;
+  matched_count: number;
+  issue_count: number;
+  manual_review_count: number;
+  total_ordered_bottles: number;
+  total_received_bottles: number;
+}
+
+export interface SupplierOrderLine {
+  id: string;
+  order_id: string;
+  line_index: number;
+  upc: string;
+  item_no: string;
+  title: string;
+  shipment_date: string | null;
+  price: number;
+  discount: string;
+  ordered_qty: number;
+  uom: string;
+  pack_size: number | null;
+  ordered_bottles: number | null;
+  outstanding_qty: number;
+  line_total: number;
+  product_sku: string | null;
+  product_name: string | null;
+  product_upc: string | null;
+  inventory_stock_snapshot: number | null;
+  inventory_pack_snapshot: string | null;
+  received_bottles: number | null;
+  final_rack_count: number | null;
+  status: 'pending' | 'matched' | 'mismatched' | 'manual_review';
+  issue_type: 'pending' | 'matched' | 'short_received' | 'extra_received' | 'rack_mismatch' | 'manual_review';
+  notes: string;
+  verified_at: string | null;
+}
+
+export interface SupplierOrderDetail {
+  order: SupplierOrderSummary;
+  lines: SupplierOrderLine[];
+}

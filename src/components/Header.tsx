@@ -1,10 +1,11 @@
 import React from 'react';
-import { Package, Search, Upload, Menu, X, Image as ImageIcon, ClipboardCheck, FileText, Settings } from 'lucide-react';
+import { Package, Search, Upload, Menu, X, Image as ImageIcon, ClipboardCheck, FileText, Settings, Truck } from 'lucide-react';
 import { CameraScanner } from './CameraScanner';
+import { AppTab } from '../types';
 
 interface HeaderProps {
-  activeTab: 'inventory' | 'verify' | 'reports';
-  setActiveTab: (t: 'inventory' | 'verify' | 'reports') => void;
+  activeTab: AppTab;
+  setActiveTab: (t: AppTab) => void;
   searchQuery: string;
   setSearchQuery: (q: string) => void;
   isScanning: boolean;
@@ -57,6 +58,12 @@ export const Header: React.FC<HeaderProps> = ({
             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors flex items-center gap-2 ${activeTab === 'verify' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
           >
             <ClipboardCheck className="w-4 h-4" /> Stock Verify
+          </button>
+          <button
+            onClick={() => setActiveTab('orders')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors flex items-center gap-2 ${activeTab === 'orders' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+          >
+            <Truck className="w-4 h-4" /> Orders
           </button>
           <button 
             onClick={() => setActiveTab('reports')}
