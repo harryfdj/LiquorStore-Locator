@@ -30,6 +30,8 @@ const OrdersTab = lazy(() =>
   import('./components/OrdersTab').then(module => ({ default: module.OrdersTab })),
 );
 
+const STORE_APP_TABS: AppTab[] = ['inventory', 'verify', 'orders', 'reports'];
+
 export default function App() {
   const [user, setUser] = useState<AuthUser | null>(() => {
     const token = localStorage.getItem('token');
@@ -73,7 +75,10 @@ export default function App() {
 }
 
 function StoreApp({ user, onLogout }: { user: AuthUser, onLogout: () => void }) {
-  const [activeTab, setActiveTab] = useState<AppTab>('inventory');
+  const [activeTab, setActiveTab] = useState<AppTab>(() => {
+    const savedTab = localStorage.getItem('store_active_tab') as AppTab | null;
+    return savedTab && STORE_APP_TABS.includes(savedTab) ? savedTab : 'inventory';
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [isScanning, setIsScanning] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -84,6 +89,10 @@ function StoreApp({ user, onLogout }: { user: AuthUser, onLogout: () => void }) 
   });
 
   const inventory = useInventory(searchQuery);
+
+  useEffect(() => {
+    localStorage.setItem('store_active_tab', activeTab);
+  }, [activeTab]);
 
   useEffect(() => {
     apiJson<AuthUser>('/api/auth/me')
