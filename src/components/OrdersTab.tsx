@@ -1,13 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle, ClipboardPaste, FileText, PackageSearch, Search, Truck } from 'lucide-react';
-import { apiFetch, apiJson } from '../lib/api';
+import { AlertTriangle, CheckCircle, ClipboardPaste, Search, Truck } from 'lucide-react';
+import { apiJson } from '../lib/api';
 import { Product, SupplierOrderDetail, SupplierOrderLine, SupplierOrderSummary } from '../types';
 
 type LineDraft = {
   received: string;
-  finalRack: string;
+  rackCount: string;
   notes: string;
 };
+
+type LineFilter = 'all' | 'verified' | 'not_verified';
 
 interface OrdersTabProps {
   searchQuery: string;
@@ -35,6 +37,30 @@ function expectedRack(line: SupplierOrderLine) {
   return (line.inventory_stock_snapshot || 0) + (line.ordered_bottles || 0);
 }
 
+function draftExpectedRack(line: SupplierOrderLine, draft?: LineDraft) {
+  const received = Number(draft?.received ?? line.received_bottles ?? line.ordered_bottles ?? 0);
+  const rackCount = Number(draft?.rackCount ?? line.final_rack_count ?? line.inventory_stock_snapshot ?? 0);
+  return (Number.isFinite(received) ? received : 0) + (Number.isFinite(rackCount) ? rackCount : 0);
+}
+
+function isLineVerified(line: SupplierOrderLine) {
+  return !['pending', 'manual_review'].includes(line.issue_type);
+}
+
+function matchesLineSearch(line: SupplierOrderLine, needle: string) {
+  const normalized = needle.trim().toLowerCase();
+  if (!normalized) return true;
+
+  return [
+    line.upc,
+    line.product_upc,
+    line.item_no,
+    line.product_sku,
+    line.title,
+    line.product_name,
+  ].filter(Boolean).some(value => value!.toLowerCase().includes(normalized));
+}
+
 export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
   const [orders, setOrders] = useState<SupplierOrderSummary[]>([]);
   const [detail, setDetail] = useState<SupplierOrderDetail | null>(null);
@@ -45,6 +71,8 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
   const [drafts, setDrafts] = useState<Record<string, LineDraft>>({});
   const [productSearch, setProductSearch] = useState<Record<string, string>>({});
   const [productResults, setProductResults] = useState<Record<string, Product[]>>({});
+  const [isVerificationMode, setIsVerificationMode] = useState(false);
+  const [lineFilter, setLineFilter] = useState<LineFilter>('all');
 
   const loadOrders = async () => {
     setOrders(await apiJson<SupplierOrderSummary[]>('/api/orders'));
@@ -53,6 +81,8 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
   const loadDetail = async (orderId: string) => {
     const nextDetail = await apiJson<SupplierOrderDetail>(`/api/orders/${orderId}`);
     setDetail(nextDetail);
+    setIsVerificationMode(false);
+    setSearchQuery('');
   };
 
   useEffect(() => {
@@ -67,7 +97,11 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
     for (const line of detail.lines) {
       nextDrafts[line.id] = {
         received: String(line.received_bottles ?? line.ordered_bottles ?? 0),
-        finalRack: String(line.final_rack_count ?? expectedRack(line)),
+        rackCount: String(
+          line.issue_type === 'pending' || line.issue_type === 'manual_review'
+            ? line.inventory_stock_snapshot ?? 0
+            : line.final_rack_count ?? line.inventory_stock_snapshot ?? 0
+        ),
         notes: line.notes || '',
       };
     }
@@ -85,6 +119,20 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
       document.getElementById(`order-line-${match.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, [searchQuery, detail]);
+
+  const visibleLines = useMemo(() => {
+    if (!detail) return [];
+    const needle = searchQuery.trim().toLowerCase();
+    const filteredByStatus = detail.lines.filter(line => {
+      if (lineFilter === 'verified') return isLineVerified(line);
+      if (lineFilter === 'not_verified') return !isLineVerified(line);
+      return true;
+    });
+
+    if (!needle) return isVerificationMode ? [] : filteredByStatus;
+
+    return filteredByStatus.filter(line => matchesLineSearch(line, needle));
+  }, [detail, searchQuery, lineFilter, isVerificationMode]);
 
   const summary = useMemo(() => {
     if (!detail) return null;
@@ -138,12 +186,13 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
       method: 'PUT',
       body: JSON.stringify({
         received_bottles: draft.received,
-        final_rack_count: draft.finalRack,
+        final_rack_count: draft.rackCount,
         notes: draft.notes,
       }),
     });
     setDetail(nextDetail);
     await loadOrders();
+    if (isVerificationMode) setSearchQuery('');
   };
 
   const finalizeOrder = async () => {
@@ -159,7 +208,8 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
   };
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[360px_1fr]">
+    <div className={isVerificationMode ? 'space-y-6' : 'grid gap-6 xl:grid-cols-[360px_1fr]'}>
+      {!isVerificationMode && (
       <div className="space-y-6">
         <section className="surface-card p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Order Receiving</p>
@@ -211,6 +261,7 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
           </div>
         </section>
       </div>
+      )}
 
       <section className="surface-card min-h-[720px] overflow-hidden">
         {!detail ? (
@@ -221,21 +272,38 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
           </div>
         ) : (
           <div>
-            <div className="border-b border-slate-200 bg-slate-50/80 p-5">
+            <div className="border-b border-slate-200 bg-slate-50/80 p-3 sm:p-5">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Receiving Order</p>
                   <h3 className="mt-1 text-2xl font-semibold text-slate-950">{detail.order.order_no}</h3>
                   <p className="mt-1 text-sm text-slate-500">
-                    {detail.order.document_no} · {detail.order.shipping_method} · {detail.order.shipment_date || 'No shipment date'}
+                    {detail.order.document_no}
+                    {' · '}
+                    {detail.order.shipping_method || 'No shipping method'}
+                    {' · '}
+                    {detail.order.shipment_date || 'No shipment date'}
+                    {' · Location · '}
+                    {detail.order.location_code || 'No location'}
                   </p>
                 </div>
-                <button onClick={finalizeOrder} disabled={detail.order.status === 'finalized' || (summary?.pending || 0) > 0} className="btn-primary px-5 py-2.5 text-sm">
-                  Finalize Report
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => {
+                      setIsVerificationMode(!isVerificationMode);
+                      setSearchQuery('');
+                    }}
+                    className={isVerificationMode ? 'btn-secondary px-5 py-2.5 text-sm' : 'btn-accent px-5 py-2.5 text-sm'}
+                  >
+                    {isVerificationMode ? 'Exit Verification Mode' : 'Verification Mode'}
+                  </button>
+                  <button onClick={finalizeOrder} disabled={detail.order.status === 'finalized' || (summary?.pending || 0) > 0} className="btn-primary px-5 py-2.5 text-sm">
+                    Finalize Report
+                  </button>
+                </div>
               </div>
 
-              <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
+              <div className="mt-5 hidden gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-5">
                 <SummaryCard label="Lines" value={detail.lines.length} />
                 <SummaryCard label="Matched" value={summary?.matched || 0} />
                 <SummaryCard label="Issues" value={summary?.issues || 0} />
@@ -243,37 +311,79 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
                 <SummaryCard label="Received Bottles" value={detail.order.total_received_bottles} />
               </div>
 
-              <div className="relative mt-5">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  value={searchQuery}
-                  onChange={event => setSearchQuery(event.target.value)}
-                  className="control-input w-full py-2.5 pl-10 pr-3 text-sm"
-                  placeholder="Scan or type UPC/item number to jump to an order line..."
-                />
-              </div>
+              {!isVerificationMode && (
+                <div className="relative mt-5">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={searchQuery}
+                    onChange={event => setSearchQuery(event.target.value)}
+                    className="control-input w-full py-2.5 pl-10 pr-3 text-sm"
+                    placeholder="Scan or type UPC, item number, SKU, or name to show only that item..."
+                  />
+                </div>
+              )}
             </div>
 
-            <div className="space-y-4 p-5">
-              {detail.lines.map(line => (
-                <div id={`order-line-${line.id}`} key={line.id} className="surface-panel p-4">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-3 p-3 sm:space-y-4 sm:p-5">
+              {!isVerificationMode && (
+                <div className="flex flex-wrap gap-2">
+                  <FilterButton active={lineFilter === 'all'} onClick={() => setLineFilter('all')}>
+                    All lines
+                  </FilterButton>
+                  <FilterButton active={lineFilter === 'not_verified'} onClick={() => setLineFilter('not_verified')}>
+                    Not verified
+                  </FilterButton>
+                  <FilterButton active={lineFilter === 'verified'} onClick={() => setLineFilter('verified')}>
+                    Verified
+                  </FilterButton>
+                </div>
+              )}
+
+              {isVerificationMode && !searchQuery.trim() && (
+                <div className="mx-auto flex min-h-[360px] max-w-3xl flex-col items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+                  <Search className="mb-4 h-12 w-12 text-slate-300" />
+                  <h4 className="text-2xl font-semibold text-slate-950">Scan an item to verify</h4>
+                  <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
+                    The matching order line will appear here. Mark it matched or save a mismatch, then the screen clears for the next scan.
+                  </p>
+                </div>
+              )}
+
+              {!isVerificationMode && searchQuery.trim() && (
+                <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  <span>Showing {visibleLines.length} of {detail.lines.length} order lines for "{searchQuery.trim()}".</span>
+                  <button onClick={() => setSearchQuery('')} className="font-semibold text-slate-950 hover:text-lime-700">
+                    Clear search
+                  </button>
+                </div>
+              )}
+
+              {visibleLines.length === 0 && (!isVerificationMode || searchQuery.trim()) ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm font-medium text-amber-800">
+                  No order line matches this search.
+                </div>
+              ) : visibleLines.map(line => (
+                <div id={`order-line-${line.id}`} key={line.id} className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-5">
+                  <div className="flex flex-col gap-3 border-b border-slate-100 pb-3 sm:pb-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className={`status-chip ${statusClass(line)}`}>{statusLabel(line)}</span>
-                        <span className="status-chip border-slate-200 bg-slate-50 text-slate-500">{line.uom}</span>
-                        {line.pack_size && <span className="status-chip border-slate-200 bg-slate-50 text-slate-500">Pack {line.pack_size}</span>}
+                        <span className="status-chip border-slate-200 bg-slate-50 text-slate-600">{line.uom}</span>
+                        {line.pack_size && <span className="status-chip border-slate-200 bg-slate-50 text-slate-600">Pack {line.pack_size}</span>}
                       </div>
-                      <h4 className="mt-3 text-lg font-semibold text-slate-950">{line.title}</h4>
-                      <p className="mt-1 text-xs font-mono text-slate-500">
-                        UPC {line.upc || 'N/A'} · Item {line.item_no || 'N/A'} · Product {line.product_sku || 'Not matched'}
-                      </p>
+                      <h4 className="mt-2 text-lg font-semibold leading-snug text-slate-950 sm:mt-3 sm:text-xl">{line.title}</h4>
+                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
+                        <span>UPC <span className="font-mono text-slate-700">{line.upc || 'N/A'}</span></span>
+                        <span>Item <span className="font-mono text-slate-700">{line.item_no || 'N/A'}</span></span>
+                        <span>Product <span className="font-mono text-slate-700">{line.product_sku || 'Not matched'}</span></span>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 text-center text-sm">
-                      <Metric label="Ordered" value={line.ordered_bottles ?? 'Review'} />
-                      <Metric label="Current" value={line.inventory_stock_snapshot ?? 'N/A'} />
-                      <Metric label="Expected Rack" value={line.ordered_bottles === null ? 'Review' : expectedRack(line)} />
-                    </div>
+                  </div>
+
+                  <div className="mt-3 grid gap-2 sm:mt-4 sm:grid-cols-3 sm:gap-3">
+                    <Metric label="Ordered Bottles" value={line.ordered_bottles ?? 'Review'} />
+                    <Metric label="Current Rack Count" value={line.inventory_stock_snapshot ?? 'N/A'} />
+                    <Metric label="Expected Rack After Delivery" value={line.ordered_bottles === null ? 'Review' : draftExpectedRack(line, drafts[line.id])} />
                   </div>
 
                   {line.issue_type === 'manual_review' && (
@@ -310,39 +420,56 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
                   )}
 
                   {line.product_sku && line.ordered_bottles !== null && (
-                    <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr_1.5fr_auto_auto]">
-                      <input
-                        type="number"
-                        min="0"
-                        value={drafts[line.id]?.received || ''}
-                        onChange={event => setDrafts(prev => ({ ...prev, [line.id]: { ...prev[line.id], received: event.target.value } }))}
-                        className="control-input px-3 py-2 text-sm"
-                        placeholder="Received bottles"
-                      />
-                      <input
-                        type="number"
-                        min="0"
-                        value={drafts[line.id]?.finalRack || ''}
-                        onChange={event => setDrafts(prev => ({ ...prev, [line.id]: { ...prev[line.id], finalRack: event.target.value } }))}
-                        className="control-input px-3 py-2 text-sm"
-                        placeholder="Final rack count"
-                      />
-                      <input
-                        value={drafts[line.id]?.notes || ''}
-                        onChange={event => setDrafts(prev => ({ ...prev, [line.id]: { ...prev[line.id], notes: event.target.value } }))}
-                        className="control-input px-3 py-2 text-sm"
-                        placeholder="Optional note"
-                      />
-                      <button
-                        onClick={() => verifyLine(line, { received: String(line.ordered_bottles), finalRack: String(expectedRack(line)), notes: drafts[line.id]?.notes || '' })}
-                        className="btn-accent flex items-center justify-center gap-2 px-4 py-2 text-sm"
-                      >
-                        <CheckCircle className="h-4 w-4" />
-                        Matched
-                      </button>
-                      <button onClick={() => verifyLine(line)} className="btn-primary px-4 py-2 text-sm">
-                        Save Mismatch
-                      </button>
+                    <div className="mt-4 rounded-3xl border border-slate-200 bg-slate-50 p-3 sm:mt-5 sm:p-4">
+                      <div className="mb-3 sm:mb-4">
+                        <p className="text-sm font-semibold text-slate-950">Receive this item</p>
+                        <p className="text-xs text-slate-500">If the delivery is correct, use the green button. If not, enter the actual counts and save a mismatch.</p>
+                      </div>
+
+                      <div className="grid gap-3 md:grid-cols-3">
+                        <label className="block">
+                          <span className="field-label">Received bottles</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={drafts[line.id]?.received || ''}
+                            onChange={event => setDrafts(prev => ({ ...prev, [line.id]: { ...prev[line.id], received: event.target.value } }))}
+                            className="control-input mt-1 w-full px-3 py-3 text-base"
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="field-label">Rack count</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={drafts[line.id]?.rackCount || ''}
+                            onChange={event => setDrafts(prev => ({ ...prev, [line.id]: { ...prev[line.id], rackCount: event.target.value } }))}
+                            className="control-input mt-1 w-full px-3 py-3 text-base"
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="field-label">Note</span>
+                          <input
+                            value={drafts[line.id]?.notes || ''}
+                            onChange={event => setDrafts(prev => ({ ...prev, [line.id]: { ...prev[line.id], notes: event.target.value } }))}
+                            className="control-input mt-1 w-full px-3 py-3 text-base"
+                            placeholder="Optional"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        <button
+                          onClick={() => verifyLine(line, { received: String(line.ordered_bottles), rackCount: String(line.inventory_stock_snapshot ?? 0), notes: drafts[line.id]?.notes || '' })}
+                          className="btn-accent flex min-h-12 items-center justify-center gap-2 px-4 py-3 text-base"
+                        >
+                          <CheckCircle className="h-5 w-5" />
+                          Mark as Matched
+                        </button>
+                        <button onClick={() => verifyLine(line)} className="btn-primary min-h-12 px-4 py-3 text-base">
+                          Save as Mismatch
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -361,6 +488,21 @@ function SummaryCard({ label, value }: { label: string; value: string | number }
       <p className="text-xs font-medium text-slate-500">{label}</p>
       <p className="mt-1 text-xl font-semibold text-slate-950">{value}</p>
     </div>
+  );
+}
+
+function FilterButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-2xl border px-4 py-2 text-sm font-semibold transition-colors ${
+        active
+          ? 'border-slate-950 bg-slate-950 text-white'
+          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-950'
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 

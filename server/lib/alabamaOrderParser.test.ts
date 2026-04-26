@@ -125,4 +125,40 @@ describe('parseAlabamaOrderHtml', () => {
       ordered_bottles: null,
     });
   });
+
+  it('parses inline shipping method and location labels with colons', () => {
+    const parsed = parseAlabamaOrderHtml(`
+      <div class="Order_general-info">
+        <div>Document no.: DOC-1003</div>
+        <div>Order no.: ORD-2003</div>
+        <div>Shipping method :Pick Up in store</div>
+        <div>Location: Store 236</div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>UPC</th><th>Item No.</th><th>Title</th><th>Shipment date</th><th>Price</th><th>Discount</th><th>Qty</th><th>Pack Size</th><th>UOM</th><th>Qty Outstanding</th><th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="Order_product-line">
+            <td>012345678905</td>
+            <td class="Order_line-id">INLINE1</td>
+            <td class="Order_line-title">Inline Label Whiskey</td>
+            <td class="Order_line-shipment-date"></td>
+            <td class="Order_line-price">$1.00</td>
+            <td class="Order_line-discount">$0.00</td>
+            <td class="Order_line-qty">1</td>
+            <td>1</td>
+            <td class="Order_line-uom">Bottles</td>
+            <td class="Order_line-qty-outstanding">0</td>
+            <td class="Order_line-total">$1.00</td>
+          </tr>
+        </tbody>
+      </table>
+    `);
+
+    expect(parsed.shipping_method).toBe('Pick Up in store');
+    expect(parsed.location_code).toBe('Store 236');
+  });
 });

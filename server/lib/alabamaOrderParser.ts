@@ -35,6 +35,14 @@ function cleanText(value: string) {
   return value.replace(/\s+/g, ' ').trim();
 }
 
+function normalizeInfoLabel(value: string) {
+  return cleanText(value).replace(/\s*:\s*$/, '').toLowerCase();
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function parseMoney(value: string) {
   const normalized = value.replace(/[$,\s]/g, '');
   const parsed = Number.parseFloat(normalized);
@@ -66,11 +74,25 @@ function normalizeDate(value: string) {
 
 function getInfoValue($: cheerio.CheerioAPI, label: string) {
   let value = '';
+  const normalizedLabel = normalizeInfoLabel(label);
+
   $('.Order_general-info dt').each((_, element) => {
-    if (cleanText($(element).text()).toLowerCase() === label.toLowerCase()) {
+    if (normalizeInfoLabel($(element).text()) === normalizedLabel) {
       value = cleanText($(element).next('dd').text());
     }
   });
+
+  if (value) return value;
+
+  const inlinePattern = new RegExp(`^${escapeRegExp(label)}\\s*:?\\s*(.+)$`, 'i');
+  $('.Order_general-info *').each((_, element) => {
+    if (value) return;
+
+    const text = cleanText($(element).text());
+    const match = text.match(inlinePattern);
+    if (match?.[1]) value = cleanText(match[1]);
+  });
+
   return value;
 }
 

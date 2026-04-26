@@ -7,6 +7,7 @@ import { requireAuth } from '../middlewares/auth';
 
 const router = express.Router();
 router.use(requireAuth);
+const PRODUCT_PAGE_SIZE = 1000;
 
 function parsePackSize(value: unknown) {
   if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value);
@@ -19,6 +20,34 @@ function isValidUpc(value: string) {
   return /^\d{6,}$/.test(value);
 }
 
+function normalizeCode(value: string) {
+  return value.trim();
+}
+
+async function productsForStore(storeId: string) {
+  const products: ProductRow[] = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabaseAdmin
+      .from('products')
+      .select('*')
+      .eq('store_id', storeId)
+      .order('name', { ascending: true })
+      .range(from, from + PRODUCT_PAGE_SIZE - 1);
+
+    if (error) throw error;
+
+    const page = (data || []) as ProductRow[];
+    products.push(...page);
+
+    if (page.length < PRODUCT_PAGE_SIZE) break;
+    from += PRODUCT_PAGE_SIZE;
+  }
+
+  return products;
+}
+
 function calculateOrderedBottles(line: ParsedAlabamaOrderLine, product: ProductRow | null) {
   if (line.uom.toLowerCase().includes('bottle')) return Math.round(line.ordered_qty);
   if (!line.uom.toLowerCase().includes('case')) return line.ordered_bottles;
@@ -27,25 +56,30 @@ function calculateOrderedBottles(line: ParsedAlabamaOrderLine, product: ProductR
   return packSize ? Math.round(line.ordered_qty * packSize) : null;
 }
 
-async function findProductByOrderLine(storeId: string, line: ParsedAlabamaOrderLine) {
-  if (isValidUpc(line.upc)) {
-    const { data: mainMatch, error: mainError } = await supabaseAdmin
-      .from('products')
-      .select('*')
-      .eq('store_id', storeId)
-      .or(`mainupc.eq.${line.upc},sku.eq.${line.upc}`)
-      .maybeSingle();
-    if (mainError) throw mainError;
-    if (mainMatch) return mainMatch as ProductRow;
+function findProductByOrderLine(products: ProductRow[], line: ParsedAlabamaOrderLine) {
+  const upc = normalizeCode(line.upc);
+  if (!isValidUpc(upc)) return null;
 
-    const { data: altMatches, error: altError } = await supabaseAdmin
-      .from('products')
-      .select('*')
-      .eq('store_id', storeId)
-      .contains('alt_upcs', [line.upc])
-      .limit(1);
-    if (altError) throw altError;
-    if (altMatches?.[0]) return altMatches[0] as ProductRow;
+  const variants = new Set([upc]);
+  if (upc.length === 11) variants.add(`0${upc}`);
+  if (upc.length > 8) variants.add(upc.slice(0, -1));
+
+  const exact = products.find(product => {
+    const codes = [product.sku, product.mainupc, ...(product.alt_upcs || [])].filter(Boolean);
+    return codes.some(code => variants.has(code));
+  });
+
+  if (exact) return exact;
+
+  if (upc.length >= 6) {
+    const candidates = products
+      .filter(product => {
+        const codes = [product.mainupc, ...(product.alt_upcs || [])].filter(Boolean);
+        return codes.some(code => code.includes(upc) || upc.includes(code));
+      })
+      .slice(0, 10);
+
+    if (candidates.length === 1) return candidates[0];
   }
 
   return null;
@@ -143,9 +177,10 @@ router.post('/import-html', async (req, res) => {
       .eq('order_id', orderId);
     if (deleteError) throw deleteError;
 
+    const products = await productsForStore(storeId);
     const lines = [];
     for (const line of parsed.lines) {
-      const product = await findProductByOrderLine(storeId, line);
+      const product = findProductByOrderLine(products, line);
       const orderedBottles = calculateOrderedBottles(line, product);
       const needsReview = !product || orderedBottles === null || !isValidUpc(line.upc);
 
@@ -277,11 +312,11 @@ router.put('/:id/lines/:lineId/verify', async (req, res) => {
     if (lineError || !line) throw new HttpError(404, 'Order line not found');
 
     const typedLine = line as SupplierOrderLineRow;
-    const expectedRack = (typedLine.inventory_stock_snapshot || 0) + (typedLine.ordered_bottles || 0);
+    const databaseRackCount = typedLine.inventory_stock_snapshot || 0;
     let issueType: SupplierOrderLineRow['issue_type'] = 'matched';
     if (typedLine.ordered_bottles !== null && body.received_bottles < typedLine.ordered_bottles) issueType = 'short_received';
     else if (typedLine.ordered_bottles !== null && body.received_bottles > typedLine.ordered_bottles) issueType = 'extra_received';
-    else if (body.final_rack_count !== expectedRack) issueType = 'rack_mismatch';
+    else if (body.final_rack_count !== databaseRackCount) issueType = 'rack_mismatch';
 
     const { error } = await supabaseAdmin
       .from('supplier_order_lines')
