@@ -26,6 +26,8 @@ status: draft
 - `GET /api/orders` — list orders for the current store with line aggregates.
 - `GET /api/orders/:id` — order detail with lines.
 - `DELETE /api/orders/:id` — remove a non-finalized import and its lines (`supplier_order_lines` cascade). Returns `204` on success. Finalized orders return `400`.
+- `PUT /api/orders/:id/lines/:lineId/verify` and `PUT .../match-product` return `400` if the order is **finalized** (no further line edits).
+- `POST /api/orders/:id/finalize` returns `400` if the order is already finalized.
 
 ## Auth Flow
 

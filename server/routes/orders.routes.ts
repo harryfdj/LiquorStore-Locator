@@ -116,6 +116,19 @@ function mapOrder(row: SupplierOrderRow, lines: SupplierOrderLineRow[] = []) {
   };
 }
 
+async function requireOrderNotFinalized(storeId: string, orderId: string) {
+  const { data: row, error } = await supabaseAdmin
+    .from('supplier_orders')
+    .select('status')
+    .eq('store_id', storeId)
+    .eq('id', orderId)
+    .single();
+  if (error || !row) throw new HttpError(404, 'Order not found');
+  if ((row as Pick<SupplierOrderRow, 'status'>).status === 'finalized') {
+    throw new HttpError(400, 'Cannot modify a finalized order');
+  }
+}
+
 async function loadOrder(storeId: string, orderId: string) {
   const { data: order, error } = await supabaseAdmin
     .from('supplier_orders')
@@ -284,6 +297,7 @@ router.delete('/:id', async (req, res) => {
 router.put('/:id/lines/:lineId/match-product', async (req, res) => {
   try {
     const storeId = requireStoreId(req);
+    await requireOrderNotFinalized(storeId, req.params.id);
     const { product_sku } = matchOrderLineSchema.parse(req.body);
     const product = await findProductBySku(storeId, product_sku);
 
@@ -330,6 +344,7 @@ router.put('/:id/lines/:lineId/match-product', async (req, res) => {
 router.put('/:id/lines/:lineId/verify', async (req, res) => {
   try {
     const storeId = requireStoreId(req);
+    await requireOrderNotFinalized(storeId, req.params.id);
     const body = verifyOrderLineSchema.parse(req.body);
     const { data: line, error: lineError } = await supabaseAdmin
       .from('supplier_order_lines')
@@ -380,6 +395,9 @@ router.post('/:id/finalize', async (req, res) => {
   try {
     const storeId = requireStoreId(req);
     const detail = await loadOrder(storeId, req.params.id);
+    if (detail.order.status === 'finalized') {
+      throw new HttpError(400, 'Order is already finalized');
+    }
     const pending = detail.lines.filter(line => line.issue_type === 'pending' || line.issue_type === 'manual_review');
     if (pending.length > 0) {
       throw new HttpError(400, 'Resolve all pending/manual review lines before finalizing');

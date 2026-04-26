@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle, ClipboardPaste, Search, Trash2, Truck } from 'lucide-react';
+import { AlertTriangle, CheckCircle, ClipboardPaste, Lock, Search, Trash2, Truck } from 'lucide-react';
 import { AdminConfirmModal } from './AdminConfirmModal';
 import { apiFetch, apiJson } from '../lib/api';
 import { Product, SupplierOrderDetail, SupplierOrderLine, SupplierOrderSummary } from '../types';
@@ -17,7 +17,7 @@ type LineDraft = {
   notes: string;
 };
 
-type LineFilter = 'all' | 'verified' | 'not_verified';
+type LineFilter = 'all' | 'verified' | 'not_verified' | 'matched' | 'issues';
 
 interface OrdersTabProps {
   searchQuery: string;
@@ -53,6 +53,11 @@ function draftExpectedRack(line: SupplierOrderLine, draft?: LineDraft) {
 
 function isLineVerified(line: SupplierOrderLine) {
   return !['pending', 'manual_review'].includes(line.issue_type);
+}
+
+/** Lines counted in the Issues summary (not pending, not cleanly matched). */
+function isIssueSummaryLine(line: SupplierOrderLine) {
+  return !['pending', 'matched'].includes(line.issue_type);
 }
 
 function matchesLineSearch(line: SupplierOrderLine, needle: string) {
@@ -93,6 +98,7 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
     setDetail(nextDetail);
     setIsVerificationMode(false);
     setSearchQuery('');
+    setLineFilter('all');
   };
 
   useEffect(() => {
@@ -147,6 +153,8 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
     const filteredByStatus = detail.lines.filter(line => {
       if (lineFilter === 'verified') return isLineVerified(line);
       if (lineFilter === 'not_verified') return !isLineVerified(line);
+      if (lineFilter === 'matched') return line.issue_type === 'matched';
+      if (lineFilter === 'issues') return isIssueSummaryLine(line);
       return true;
     });
 
@@ -159,10 +167,12 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
     if (!detail) return null;
     return {
       matched: detail.lines.filter(line => line.issue_type === 'matched').length,
-      issues: detail.lines.filter(line => !['pending', 'matched'].includes(line.issue_type)).length,
+      issues: detail.lines.filter(line => isIssueSummaryLine(line)).length,
       pending: detail.lines.filter(line => ['pending', 'manual_review'].includes(line.issue_type)).length,
     };
   }, [detail]);
+
+  const orderLocked = detail?.order.status === 'finalized';
 
   const importOrder = async () => {
     setIsImporting(true);
@@ -173,6 +183,7 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
         body: JSON.stringify({ html }),
       });
       setDetail(imported);
+      setLineFilter('all');
       setHtml('');
       await loadOrders();
       setMessage({ type: 'success', text: `Imported order ${imported.order.order_no} with ${imported.lines.length} lines.` });
@@ -191,7 +202,7 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
   };
 
   const matchProduct = async (line: SupplierOrderLine, sku: string) => {
-    if (!detail) return;
+    if (!detail || detail.order.status === 'finalized') return;
     const nextDetail = await apiJson<SupplierOrderDetail>(`/api/orders/${detail.order.id}/lines/${line.id}/match-product`, {
       method: 'PUT',
       body: JSON.stringify({ product_sku: sku }),
@@ -201,7 +212,7 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
   };
 
   const verifyLine = async (line: SupplierOrderLine, values?: Partial<LineDraft>) => {
-    if (!detail) return;
+    if (!detail || detail.order.status === 'finalized') return;
     const draft = { ...drafts[line.id], ...values };
     const nextDetail = await apiJson<SupplierOrderDetail>(`/api/orders/${detail.order.id}/lines/${line.id}/verify`, {
       method: 'PUT',
@@ -221,6 +232,7 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
     try {
       const nextDetail = await apiJson<SupplierOrderDetail>(`/api/orders/${detail.order.id}/finalize`, { method: 'POST' });
       setDetail(nextDetail);
+      setIsVerificationMode(false);
       await loadOrders();
       setMessage({ type: 'success', text: `Finalized order ${nextDetail.order.order_no}.` });
     } catch (error) {
@@ -381,6 +393,8 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button
+                    type="button"
+                    disabled={orderLocked}
                     onClick={() => {
                       setIsVerificationMode(!isVerificationMode);
                       setSearchQuery('');
@@ -389,18 +403,55 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
                   >
                     {isVerificationMode ? 'Exit Verification Mode' : 'Verification Mode'}
                   </button>
-                  <button onClick={finalizeOrder} disabled={detail.order.status === 'finalized' || (summary?.pending || 0) > 0} className="btn-primary px-5 py-2.5 text-sm">
+                  <button type="button" onClick={finalizeOrder} disabled={orderLocked || (summary?.pending || 0) > 0} className="btn-primary px-5 py-2.5 text-sm">
                     Finalize Report
                   </button>
                 </div>
               </div>
 
+              {orderLocked && (
+                <div className="mt-4 flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
+                  <Lock className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" aria-hidden />
+                  <p>
+                    <span className="font-semibold text-slate-950">Finalized report.</span>{' '}
+                    Receiving counts, rack values, notes, and product matches cannot be changed for this order.
+                  </p>
+                </div>
+              )}
+
               <div className="mt-5 hidden gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-5">
-                <SummaryCard label="Lines" value={detail.lines.length} />
-                <SummaryCard label="Matched" value={summary?.matched || 0} />
-                <SummaryCard label="Issues" value={summary?.issues || 0} />
-                <SummaryCard label="Ordered Bottles" value={detail.order.total_ordered_bottles} />
-                <SummaryCard label="Received Bottles" value={detail.order.total_received_bottles} />
+                <SummaryStatCard
+                  label="Lines"
+                  value={detail.lines.length}
+                  active={lineFilter === 'all'}
+                  title="Show all order lines"
+                  onClick={() => {
+                    setLineFilter('all');
+                    setSearchQuery('');
+                  }}
+                />
+                <SummaryStatCard
+                  label="Matched"
+                  value={summary?.matched || 0}
+                  active={lineFilter === 'matched'}
+                  title="Show matched lines only"
+                  onClick={() => {
+                    setLineFilter('matched');
+                    setSearchQuery('');
+                  }}
+                />
+                <SummaryStatCard
+                  label="Issues"
+                  value={summary?.issues || 0}
+                  active={lineFilter === 'issues'}
+                  title="Show issue lines (short, extra, rack mismatch, manual review)"
+                  onClick={() => {
+                    setLineFilter('issues');
+                    setSearchQuery('');
+                  }}
+                />
+                <SummaryStatCard label="Ordered Bottles" value={detail.order.total_ordered_bottles} />
+                <SummaryStatCard label="Received Bottles" value={detail.order.total_received_bottles} />
               </div>
 
               {!isVerificationMode && (
@@ -419,13 +470,31 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
             <div className="space-y-3 p-3 sm:space-y-4 sm:p-5">
               {!isVerificationMode && (
                 <div className="flex flex-wrap gap-2">
-                  <FilterButton active={lineFilter === 'all'} onClick={() => setLineFilter('all')}>
+                  <FilterButton
+                    active={lineFilter === 'all'}
+                    onClick={() => {
+                      setLineFilter('all');
+                      setSearchQuery('');
+                    }}
+                  >
                     All lines
                   </FilterButton>
-                  <FilterButton active={lineFilter === 'not_verified'} onClick={() => setLineFilter('not_verified')}>
+                  <FilterButton
+                    active={lineFilter === 'not_verified'}
+                    onClick={() => {
+                      setLineFilter('not_verified');
+                      setSearchQuery('');
+                    }}
+                  >
                     Not verified
                   </FilterButton>
-                  <FilterButton active={lineFilter === 'verified'} onClick={() => setLineFilter('verified')}>
+                  <FilterButton
+                    active={lineFilter === 'verified'}
+                    onClick={() => {
+                      setLineFilter('verified');
+                      setSearchQuery('');
+                    }}
+                  >
                     Verified
                   </FilterButton>
                 </div>
@@ -444,15 +513,45 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
               {!isVerificationMode && searchQuery.trim() && (
                 <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                   <span>Showing {visibleLines.length} of {detail.lines.length} order lines for "{searchQuery.trim()}".</span>
-                  <button onClick={() => setSearchQuery('')} className="font-semibold text-slate-950 hover:text-lime-700">
+                  <button type="button" onClick={() => setSearchQuery('')} className="font-semibold text-slate-950 hover:text-lime-700">
                     Clear search
+                  </button>
+                </div>
+              )}
+
+              {!isVerificationMode && !searchQuery.trim() && (lineFilter === 'matched' || lineFilter === 'issues') && (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  <span>
+                    {lineFilter === 'matched'
+                      ? `Showing matched lines only (${visibleLines.length} of ${detail.lines.length}).`
+                      : `Showing issue lines only (${visibleLines.length} of ${detail.lines.length}).`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLineFilter('all');
+                      setSearchQuery('');
+                    }}
+                    className="font-semibold text-slate-950 hover:text-lime-700"
+                  >
+                    Show all lines
                   </button>
                 </div>
               )}
 
               {visibleLines.length === 0 && (!isVerificationMode || searchQuery.trim()) ? (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm font-medium text-amber-800">
-                  No order line matches this search.
+                  {searchQuery.trim()
+                    ? 'No order line matches this search.'
+                    : lineFilter === 'matched'
+                      ? 'No matched lines yet. Verify items as matched to see them here.'
+                      : lineFilter === 'issues'
+                        ? 'No issue lines. Issues include short received, extra received, rack mismatch, and manual review.'
+                        : lineFilter === 'verified'
+                          ? 'No verified lines yet.'
+                          : lineFilter === 'not_verified'
+                            ? 'All lines are verified.'
+                            : 'No order lines in this import.'}
                 </div>
               ) : visibleLines.map(line => (
                 <div id={`order-line-${line.id}`} key={line.id} className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-5">
@@ -489,17 +588,24 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
                             <input
                               value={productSearch[line.id] || ''}
                               onChange={event => setProductSearch(prev => ({ ...prev, [line.id]: event.target.value }))}
-                              className="control-input flex-1 px-3 py-2 text-sm"
+                              disabled={orderLocked}
+                              className="control-input flex-1 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
                               placeholder="Search product by name, SKU, or UPC..."
                             />
-                            <button onClick={() => searchProducts(line.id)} className="btn-secondary px-4 py-2 text-sm">
+                            <button type="button" disabled={orderLocked} onClick={() => searchProducts(line.id)} className="btn-secondary px-4 py-2 text-sm">
                               Search
                             </button>
                           </div>
                           {(productResults[line.id] || []).length > 0 && (
                             <div className="mt-3 grid gap-2">
                               {productResults[line.id].map(product => (
-                                <button key={product.sku} onClick={() => matchProduct(line, product.sku)} className="rounded-2xl border border-slate-200 bg-white p-3 text-left text-sm hover:border-lime-300">
+                                <button
+                                  key={product.sku}
+                                  type="button"
+                                  disabled={orderLocked}
+                                  onClick={() => matchProduct(line, product.sku)}
+                                  className="rounded-2xl border border-slate-200 bg-white p-3 text-left text-sm hover:border-lime-300 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
                                   <span className="font-semibold text-slate-950">{product.name}</span>
                                   <span className="ml-2 text-xs text-slate-500">SKU {product.sku} · Stock {product.stock} · Pack {product.pack || 'N/A'}</span>
                                 </button>
@@ -515,7 +621,11 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
                     <div className="mt-4 rounded-3xl border border-slate-200 bg-slate-50 p-3 sm:mt-5 sm:p-4">
                       <div className="mb-3 sm:mb-4">
                         <p className="text-sm font-semibold text-slate-950">Receive this item</p>
-                        <p className="text-xs text-slate-500">If the delivery is correct, use the green button. If not, enter the actual counts and save a mismatch.</p>
+                        <p className="text-xs text-slate-500">
+                          {orderLocked
+                            ? 'This order is finalized. These values are read-only.'
+                            : 'If the delivery is correct, use the green button. If not, enter the actual counts and save a mismatch.'}
+                        </p>
                       </div>
 
                       <div className="grid gap-3 md:grid-cols-3">
@@ -526,7 +636,8 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
                             min="0"
                             value={drafts[line.id]?.received || ''}
                             onChange={event => setDrafts(prev => ({ ...prev, [line.id]: { ...prev[line.id], received: event.target.value } }))}
-                            className="control-input mt-1 w-full px-3 py-3 text-base"
+                            disabled={orderLocked}
+                            className="control-input mt-1 w-full px-3 py-3 text-base disabled:cursor-not-allowed disabled:opacity-60"
                           />
                         </label>
                         <label className="block">
@@ -536,7 +647,8 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
                             min="0"
                             value={drafts[line.id]?.rackCount || ''}
                             onChange={event => setDrafts(prev => ({ ...prev, [line.id]: { ...prev[line.id], rackCount: event.target.value } }))}
-                            className="control-input mt-1 w-full px-3 py-3 text-base"
+                            disabled={orderLocked}
+                            className="control-input mt-1 w-full px-3 py-3 text-base disabled:cursor-not-allowed disabled:opacity-60"
                           />
                         </label>
                         <label className="block">
@@ -544,7 +656,8 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
                           <input
                             value={drafts[line.id]?.notes || ''}
                             onChange={event => setDrafts(prev => ({ ...prev, [line.id]: { ...prev[line.id], notes: event.target.value } }))}
-                            className="control-input mt-1 w-full px-3 py-3 text-base"
+                            disabled={orderLocked}
+                            className="control-input mt-1 w-full px-3 py-3 text-base disabled:cursor-not-allowed disabled:opacity-60"
                             placeholder="Optional"
                           />
                         </label>
@@ -552,13 +665,15 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
 
                       <div className="mt-4 grid gap-3 sm:grid-cols-2">
                         <button
+                          type="button"
+                          disabled={orderLocked}
                           onClick={() => verifyLine(line, { received: String(line.ordered_bottles), rackCount: String(line.inventory_stock_snapshot ?? 0), notes: drafts[line.id]?.notes || '' })}
                           className="btn-accent flex min-h-12 items-center justify-center gap-2 px-4 py-3 text-base"
                         >
                           <CheckCircle className="h-5 w-5" />
                           Mark as Matched
                         </button>
-                        <button onClick={() => verifyLine(line)} className="btn-primary min-h-12 px-4 py-3 text-base">
+                        <button type="button" disabled={orderLocked} onClick={() => verifyLine(line)} className="btn-primary min-h-12 px-4 py-3 text-base">
                           Save as Mismatch
                         </button>
                       </div>
@@ -575,13 +690,41 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
   );
 }
 
-function SummaryCard({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-3">
+function SummaryStatCard({
+  label,
+  value,
+  onClick,
+  active = false,
+  title,
+}: {
+  label: string;
+  value: string | number;
+  onClick?: () => void;
+  active?: boolean;
+  title?: string;
+}) {
+  const interactive = typeof onClick === 'function';
+  const shellClass = `rounded-2xl border p-3 text-left transition-colors ${
+    interactive
+      ? active
+        ? 'border-lime-400 bg-lime-50/70 ring-2 ring-lime-200/90 shadow-sm'
+        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+      : 'border-slate-200 bg-white'
+  }`;
+  const body = (
+    <>
       <p className="text-xs font-medium text-slate-500">{label}</p>
       <p className="mt-1 text-xl font-semibold text-slate-950">{value}</p>
-    </div>
+    </>
   );
+  if (interactive) {
+    return (
+      <button type="button" className={`${shellClass} w-full`} onClick={onClick} title={title} aria-pressed={active}>
+        {body}
+      </button>
+    );
+  }
+  return <div className={shellClass}>{body}</div>;
 }
 
 function FilterButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
