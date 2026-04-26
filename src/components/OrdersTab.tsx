@@ -1,7 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle, ClipboardPaste, Search, Truck } from 'lucide-react';
-import { apiJson } from '../lib/api';
+import { AlertTriangle, CheckCircle, ClipboardPaste, Search, Trash2, Truck } from 'lucide-react';
+import { AdminConfirmModal } from './AdminConfirmModal';
+import { apiFetch, apiJson } from '../lib/api';
 import { Product, SupplierOrderDetail, SupplierOrderLine, SupplierOrderSummary } from '../types';
+
+type PendingOrderDelete = {
+  id: string;
+  orderNo: string;
+  documentNo: string;
+  lineCount: number;
+};
 
 type LineDraft = {
   received: string;
@@ -67,6 +75,8 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
   const [html, setHtml] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isImporting, setIsImporting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<PendingOrderDelete | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [drafts, setDrafts] = useState<Record<string, LineDraft>>({});
   const [productSearch, setProductSearch] = useState<Record<string, string>>({});
@@ -107,6 +117,17 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
     }
     setDrafts(nextDrafts);
   }, [detail?.order.id]);
+
+  useEffect(() => {
+    if (pendingDelete === null) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (isDeleting) return;
+      setPendingDelete(null);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [pendingDelete, isDeleting]);
 
   useEffect(() => {
     if (!detail || !searchQuery.trim()) return;
@@ -207,7 +228,54 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
     }
   };
 
+  const openDeleteOrderDialog = (target: PendingOrderDelete) => {
+    setPendingDelete(target);
+  };
+
+  const closeDeleteOrderDialog = () => {
+    if (!isDeleting) setPendingDelete(null);
+  };
+
+  const confirmDeleteImportedOrder = async () => {
+    if (!pendingDelete) return;
+    const { id, orderNo } = pendingDelete;
+    setIsDeleting(true);
+    setMessage(null);
+    try {
+      await apiFetch(`/api/orders/${id}`, { method: 'DELETE' });
+      setPendingDelete(null);
+      if (detail?.order.id === id) setDetail(null);
+      await loadOrders();
+      setMessage({ type: 'success', text: `Deleted order ${orderNo}.` });
+    } catch (error) {
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Failed to delete order' });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const deleteOrderModalMessage = pendingDelete
+    ? [
+        `Order ${pendingDelete.orderNo} · Document ${pendingDelete.documentNo}`,
+        '',
+        `This removes ${pendingDelete.lineCount} line${pendingDelete.lineCount === 1 ? '' : 's'} and all receiving verification progress for this import.`,
+        'This action cannot be undone.',
+      ].join('\n')
+    : '';
+
   return (
+    <>
+    <AdminConfirmModal
+      isOpen={pendingDelete !== null}
+      onClose={closeDeleteOrderDialog}
+      onConfirm={confirmDeleteImportedOrder}
+      title="Delete this Alabama import?"
+      message={deleteOrderModalMessage}
+      confirmText="Delete import"
+      variant="danger"
+      isLoading={isDeleting}
+      leadIcon={<Truck className="h-8 w-8" />}
+    />
     <div className={isVerificationMode ? 'space-y-6' : 'grid gap-6 xl:grid-cols-[360px_1fr]'}>
       {!isVerificationMode && (
       <div className="space-y-6">
@@ -215,7 +283,7 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Order Receiving</p>
           <h2 className="mt-2 text-2xl font-semibold text-slate-950">Import Alabama Order</h2>
           <p className="mt-2 text-sm leading-6 text-slate-500">
-            Paste the copied Alabama order HTML block. The app saves the order and prepares each line for receiving verification.
+            Paste the copied Alabama order HTML block. The app saves the order and prepares each line for receiving verification. If you import the wrong order, delete it from Saved Orders before you finalize the report.
           </p>
           <textarea
             value={html}
@@ -239,24 +307,48 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
           <div className="border-b border-slate-200 bg-slate-50/80 p-4">
             <h3 className="font-semibold text-slate-950">Saved Orders</h3>
           </div>
-          <div className="max-h-[540px] divide-y divide-slate-100 overflow-y-auto">
+          <div className="max-h-[540px] overflow-y-auto">
             {isLoading ? (
               <div className="p-5 text-sm text-slate-500">Loading orders...</div>
             ) : orders.length === 0 ? (
               <div className="p-5 text-sm text-slate-500">No orders imported yet.</div>
             ) : orders.map(order => (
-              <button
+              <div
                 key={order.id}
-                onClick={() => loadDetail(order.id)}
-                className={`w-full p-4 text-left transition-colors hover:bg-slate-50 ${detail?.order.id === order.id ? 'bg-lime-50' : ''}`}
+                className={`flex items-stretch border-b border-slate-100 last:border-b-0 ${detail?.order.id === order.id ? 'bg-lime-50' : ''}`}
               >
-                <div className="flex items-center justify-between gap-3">
-                  <p className="font-semibold text-slate-950">{order.order_no}</p>
-                  <span className="status-chip border-slate-200 bg-white text-slate-600">{order.status}</span>
-                </div>
-                <p className="mt-1 text-xs text-slate-500">{order.document_no} · {order.shipment_date || 'No shipment date'}</p>
-                <p className="mt-2 text-xs text-slate-500">{order.line_count} lines · {order.matched_count} matched · {order.issue_count} issues</p>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => loadDetail(order.id)}
+                  className="min-w-0 flex-1 p-4 text-left transition-colors hover:bg-slate-50"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-semibold text-slate-950">{order.order_no}</p>
+                    <span className="status-chip border-slate-200 bg-white text-slate-600">{order.status}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">{order.document_no} · {order.shipment_date || 'No shipment date'}</p>
+                  <p className="mt-2 text-xs text-slate-500">{order.line_count} lines · {order.matched_count} matched · {order.issue_count} issues</p>
+                </button>
+                {order.status !== 'finalized' && (
+                  <button
+                    type="button"
+                    title="Delete this import"
+                    disabled={isDeleting}
+                    onClick={() =>
+                      openDeleteOrderDialog({
+                        id: order.id,
+                        orderNo: order.order_no,
+                        documentNo: order.document_no,
+                        lineCount: order.line_count,
+                      })
+                    }
+                    className="shrink-0 border-l border-slate-100 px-3 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                  >
+                    <Trash2 className="mx-auto h-4 w-4" />
+                    <span className="sr-only">Delete order {order.order_no}</span>
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         </section>
@@ -479,6 +571,7 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
         )}
       </section>
     </div>
+    </>
   );
 }
 

@@ -252,6 +252,35 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+router.delete('/:id', async (req, res) => {
+  try {
+    const storeId = requireStoreId(req);
+    const orderId = req.params.id;
+
+    const { data: order, error: fetchError } = await supabaseAdmin
+      .from('supplier_orders')
+      .select('id, status')
+      .eq('store_id', storeId)
+      .eq('id', orderId)
+      .single();
+
+    if (fetchError || !order) throw new HttpError(404, 'Order not found');
+    const existing = order as Pick<SupplierOrderRow, 'id' | 'status'>;
+    if (existing.status === 'finalized') throw new HttpError(400, 'Cannot delete a finalized order');
+
+    const { error } = await supabaseAdmin
+      .from('supplier_orders')
+      .delete()
+      .eq('store_id', storeId)
+      .eq('id', orderId);
+
+    if (error) throw error;
+    return res.status(204).send();
+  } catch (error) {
+    return sendError(res, error, 'Failed to delete order');
+  }
+});
+
 router.put('/:id/lines/:lineId/match-product', async (req, res) => {
   try {
     const storeId = requireStoreId(req);

@@ -18,6 +18,14 @@ status: draft
 | `/api/reports` | `server/routes/reports.routes.ts` | authenticated |
 | `/api/verifications` | `server/routes/verifications.routes.ts` | authenticated |
 | `/api/image-proxy` | `server/routes/proxy.routes.ts` | authenticated |
+| `/api/orders` | `server/routes/orders.routes.ts` | authenticated (store) |
+
+## Supplier orders (Alabama import)
+
+- `POST /api/orders/import-html` — parse pasted Alabama order HTML, upsert `supplier_orders`, replace lines on `supplier_order_lines`.
+- `GET /api/orders` — list orders for the current store with line aggregates.
+- `GET /api/orders/:id` — order detail with lines.
+- `DELETE /api/orders/:id` — remove a non-finalized import and its lines (`supplier_order_lines` cascade). Returns `204` on success. Finalized orders return `400`.
 
 ## Auth Flow
 

@@ -10,6 +10,11 @@ status: active
 
 Add short notes after meaningful work. Newest entries go first.
 
+## 2026-04-26: Delete Alabama order import
+
+- Added `DELETE /api/orders/:id` for non-finalized orders (lines removed via FK cascade).
+- Orders UI: trash control on each saved order row and **Delete import** on the order header, with confirm dialog and copy about removing mistaken imports before finalize.
+
 ## 2026-04-25: Supabase Production Rewrite
 
 - Added Supabase migration `0001_initial_schema.sql` for stores, products, verifications, reports, admin profiles, and product image storage.
