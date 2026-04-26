@@ -18,6 +18,21 @@ function normalizeCode(value: string) {
   return value.trim();
 }
 
+function codeVariants(value: string) {
+  const variants = new Set<string>();
+  const addVariant = (code: string) => {
+    if (!code) return;
+    variants.add(code);
+    if (code.length > 8) variants.add(code.slice(0, -1));
+  };
+
+  addVariant(value);
+  if (value.length === 11) addVariant(`0${value}`);
+  if (value.startsWith('0')) addVariant(value.slice(1));
+
+  return variants;
+}
+
 function partialMatchCodes(product: ProductRow) {
   return [product.mainupc, ...(product.alt_upcs || [])]
     .filter(Boolean)
@@ -76,9 +91,7 @@ router.get('/upc/:upc', async (req, res) => {
   try {
     const storeId = requireStoreId(req);
     const upc = normalizeCode(req.params.upc);
-    const variants = new Set([upc]);
-    if (upc.length === 11) variants.add(`0${upc}`);
-    if (upc.length > 8) variants.add(upc.slice(0, -1));
+    const variants = codeVariants(upc);
 
     const products = await productsForStore(storeId);
     const exact = products.find(product => {
@@ -126,6 +139,10 @@ router.get('/', async (req, res) => {
     const products = (await productsForStore(storeId, department))
       .filter(product => {
         if (!search) return true;
+        const searchVariants = search.length >= 6 ? codeVariants(search) : null;
+        const codes = [product.sku, product.mainupc, ...(product.alt_upcs || [])].filter(Boolean);
+        if (searchVariants && codes.some(code => searchVariants.has(code))) return true;
+
         const haystack = [
           product.name,
           product.sku,

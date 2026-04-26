@@ -47,6 +47,7 @@ status: draft
 ## Inventory Flow
 
 - Product list and updates are under `/api/products`.
+- `GET /api/products/upc/:upc` tries exact UPC/SKU variants before partial matches, including scanner-added leading-zero variants and no-check-digit variants.
 - CSV upload is handled by the inventory router.
 - Image search and image update flow uses the scraper service and Supabase Storage.
 

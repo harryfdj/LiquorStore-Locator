@@ -10,6 +10,11 @@ status: active
 
 Add short notes after meaningful work. Newest entries go first.
 
+## 2026-04-26: Camera scanner reliability
+
+- Made scanner output and product UPC lookup tolerate the common scanner case where UPC-A is reported with one extra leading zero.
+- Re-centered the camera scanner modal with dynamic viewport sizing for phone and laptop screens.
+
 ## 2026-04-26: Bulk inventory location mode
 
 - Added inventory **Bulk Location Mode**: enter active shelf code, scan UPCs, and apply that location to products without opening each item edit panel.
