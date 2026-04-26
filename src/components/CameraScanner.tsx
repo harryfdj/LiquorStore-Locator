@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import type { IScannerControls } from '@zxing/browser';
 import { Html5Qrcode } from 'html5-qrcode';
 import { Camera, CameraOff, AlertCircle, X, ZoomIn } from 'lucide-react';
 
@@ -9,7 +10,7 @@ interface CameraScannerProps {
   buttonClassName?: string;
 }
 
-type ScannerEngine = 'native' | 'html5' | null;
+type ScannerEngine = 'native' | 'mobile' | 'html5' | null;
 
 type NativeBarcodeDetector = {
   detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue?: string }>>;
@@ -33,7 +34,8 @@ function getNativeBarcodeDetector() {
 }
 
 function isLikelyPhoneOrTablet() {
-  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
 function normalizeScannedBarcode(decodedText: string) {
@@ -59,6 +61,7 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
   const nativeStreamRef = useRef<MediaStream | null>(null);
   const nativeFrameRef = useRef<number | null>(null);
   const lastNativeDetectRef = useRef(0);
+  const mobileScannerControlsRef = useRef<IScannerControls | null>(null);
   const lastScanRef = useRef<{ text: string; time: number }>({ text: '', time: 0 });
   const onScanRef = useRef(onScan);
   const readerId = useRef(`reader-${Math.random().toString(36).substring(2, 9)}`).current;
@@ -181,6 +184,15 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
     }
   }, []);
 
+  const stopMobileScanner = useCallback(() => {
+    mobileScannerControlsRef.current?.stop();
+    mobileScannerControlsRef.current = null;
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }, []);
+
   const startNativeScanner = useCallback(async () => {
     const BarcodeDetector = getNativeBarcodeDetector();
     const videoEl = videoRef.current;
@@ -231,6 +243,45 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
     return true;
   }, [configureCameraTrack, handleDecodedText]);
 
+  const startMobileScanner = useCallback(async () => {
+    const videoEl = videoRef.current;
+    if (!navigator.mediaDevices?.getUserMedia || !videoEl) return false;
+
+    const { BrowserMultiFormatOneDReader } = await import('@zxing/browser');
+    const reader = new BrowserMultiFormatOneDReader(undefined, {
+      delayBetweenScanAttempts: 60,
+      delayBetweenScanSuccess: 500,
+      tryPlayVideoTimeout: 5000,
+    });
+
+    const controls = await reader.decodeFromConstraints(
+      {
+        audio: false,
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      },
+      videoEl,
+      (result) => {
+        const decodedText = result?.getText();
+        if (decodedText) {
+          handleDecodedText(decodedText);
+        }
+      }
+    );
+
+    mobileScannerControlsRef.current = controls;
+    setScannerEngine('mobile');
+
+    setTimeout(() => {
+      configureCameraTrack(videoEl);
+    }, 300);
+
+    return true;
+  }, [configureCameraTrack, handleDecodedText]);
+
   useEffect(() => {
     let isMounted = true;
     let html5QrCode: Html5Qrcode | null = null;
@@ -275,7 +326,15 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
       };
 
       if (isLikelyPhoneOrTablet()) {
-        startHtml5Scanner();
+        startMobileScanner()
+          .then(started => {
+            if (!started) startHtml5Scanner();
+          })
+          .catch(err => {
+            console.warn("Mobile barcode scanner unavailable, using html5-qrcode.", err);
+            stopMobileScanner();
+            startHtml5Scanner();
+          });
       } else {
         startNativeScanner()
           .then(started => {
@@ -292,6 +351,7 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
     return () => {
       isMounted = false;
       stopNativeScanner();
+      stopMobileScanner();
       if (html5QrCode && startPromise) {
         // Wait for start to finish before stopping to prevent transition errors
         startPromise.then(() => {
@@ -307,7 +367,7 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
         });
       }
     };
-  }, [configureCameraTrack, handleDecodedText, isScanning, readerId, setIsScanning, startNativeScanner, stopNativeScanner]);
+  }, [configureCameraTrack, handleDecodedText, isScanning, readerId, setIsScanning, startMobileScanner, startNativeScanner, stopMobileScanner, stopNativeScanner]);
 
   return (
     <div className="flex items-center gap-2 relative">
@@ -349,11 +409,11 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
                 ref={videoRef}
                 muted
                 playsInline
-                className={`absolute inset-0 h-full w-full object-cover ${scannerEngine === 'native' ? 'block' : 'hidden'}`}
+                className={`absolute inset-0 h-full w-full object-cover ${scannerEngine === 'native' || scannerEngine === 'mobile' ? 'block' : 'hidden'}`}
               />
               <div
                 id={readerId}
-                className={`w-full max-w-[300px] min-h-[300px] ${scannerEngine === 'native' ? 'hidden' : ''}`}
+                className={`w-full max-w-[300px] min-h-[300px] ${scannerEngine === 'native' || scannerEngine === 'mobile' ? 'hidden' : ''}`}
               />
             </div>
           </div>
@@ -377,6 +437,8 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
           <div className="p-4 text-center text-sm text-stone-500 bg-stone-50">
             {scannerEngine === 'native'
               ? 'Fast scanner is active on this device. Align the UPC horizontally in the camera view.'
+              : scannerEngine === 'mobile'
+                ? 'Mobile UPC scanner is active. Hold the barcode steady and fill the camera view.'
               : 'Phone-compatible scanner is active. Good lighting helps with curved bottles!'}
           </div>
         </div>

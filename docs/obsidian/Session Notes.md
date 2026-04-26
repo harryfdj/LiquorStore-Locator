@@ -16,6 +16,7 @@ Add short notes after meaningful work. Newest entries go first.
 - Re-centered the camera scanner modal with dynamic viewport sizing for phone and laptop screens.
 - Restored the scanner runtime to the original broad `html5-qrcode` configuration that worked on phone and laptop cameras.
 - Split scanner engines by device: desktop/laptop uses fast native `BarcodeDetector`, phones use the broad `html5-qrcode` scanner.
+- Replaced the phone path with lazy-loaded ZXing 1D barcode scanning, keeping `html5-qrcode` only as a mobile fallback.
 
 ## 2026-04-26: Bulk inventory location mode
 
