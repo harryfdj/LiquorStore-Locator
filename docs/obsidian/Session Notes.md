@@ -15,6 +15,7 @@ Add short notes after meaningful work. Newest entries go first.
 - Made scanner output and product UPC lookup tolerate the common scanner case where UPC-A is reported with one extra leading zero.
 - Re-centered the camera scanner modal with dynamic viewport sizing for phone and laptop screens.
 - Restored the scanner runtime to the original broad `html5-qrcode` configuration that worked on phone and laptop cameras.
+- Split scanner engines by device: desktop/laptop uses fast native `BarcodeDetector`, phones use the broad `html5-qrcode` scanner.
 
 ## 2026-04-26: Bulk inventory location mode
 

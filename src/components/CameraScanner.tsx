@@ -9,6 +9,33 @@ interface CameraScannerProps {
   buttonClassName?: string;
 }
 
+type ScannerEngine = 'native' | 'html5' | null;
+
+type NativeBarcodeDetector = {
+  detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue?: string }>>;
+};
+
+const NATIVE_BARCODE_FORMATS = [
+  'ean_13',
+  'ean_8',
+  'upc_a',
+  'upc_e',
+  'code_128',
+  'code_39',
+  'code_93',
+  'itf',
+] as const;
+
+function getNativeBarcodeDetector() {
+  return (window as any).BarcodeDetector as
+    | (new (options?: { formats?: readonly string[] }) => NativeBarcodeDetector)
+    | undefined;
+}
+
+function isLikelyPhoneOrTablet() {
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+}
+
 function normalizeScannedBarcode(decodedText: string) {
   const value = decodedText.trim();
 
@@ -26,7 +53,12 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
   const [zoom, setZoom] = useState(1);
   const [zoomRange, setZoomRange] = useState({ min: 1, max: 5, step: 0.1 });
   const [showZoom, setShowZoom] = useState(false);
+  const [scannerEngine, setScannerEngine] = useState<ScannerEngine>(null);
   const scannerInstanceRef = useRef<Html5Qrcode | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const nativeStreamRef = useRef<MediaStream | null>(null);
+  const nativeFrameRef = useRef<number | null>(null);
+  const lastNativeDetectRef = useRef(0);
   const lastScanRef = useRef<{ text: string; time: number }>({ text: '', time: 0 });
   const onScanRef = useRef(onScan);
   const readerId = useRef(`reader-${Math.random().toString(36).substring(2, 9)}`).current;
@@ -55,7 +87,7 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
     setZoom(newZoom);
 
     try {
-      const videoEl = document.querySelector(`#${readerId} video`) as HTMLVideoElement;
+      const videoEl = videoRef.current || document.querySelector(`#${readerId} video`) as HTMLVideoElement;
       applyZoomToVideo(videoEl, newZoom);
     } catch (err) {
       console.error("Zoom error", err);
@@ -135,6 +167,70 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
     setShowZoom(hasNativeZoom || Boolean(videoEl));
   }, [applyZoomToVideo]);
 
+  const stopNativeScanner = useCallback(() => {
+    if (nativeFrameRef.current !== null) {
+      window.cancelAnimationFrame(nativeFrameRef.current);
+      nativeFrameRef.current = null;
+    }
+
+    nativeStreamRef.current?.getTracks().forEach(track => track.stop());
+    nativeStreamRef.current = null;
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }, []);
+
+  const startNativeScanner = useCallback(async () => {
+    const BarcodeDetector = getNativeBarcodeDetector();
+    const videoEl = videoRef.current;
+
+    if (!BarcodeDetector || !navigator.mediaDevices?.getUserMedia || !videoEl) {
+      return false;
+    }
+
+    const detector = new BarcodeDetector({ formats: NATIVE_BARCODE_FORMATS });
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      },
+    });
+
+    nativeStreamRef.current = stream;
+    videoEl.srcObject = stream;
+    videoEl.setAttribute('playsinline', 'true');
+    await videoEl.play();
+
+    setScannerEngine('native');
+    configureCameraTrack(videoEl);
+
+    const detectLoop = async (timestamp: number) => {
+      if (!nativeStreamRef.current || !videoRef.current) return;
+
+      if (timestamp - lastNativeDetectRef.current >= 80) {
+        lastNativeDetectRef.current = timestamp;
+        try {
+          const barcodes = await detector.detect(videoRef.current);
+          const decodedText = barcodes.find(barcode => barcode.rawValue)?.rawValue;
+          if (decodedText) {
+            handleDecodedText(decodedText);
+            return;
+          }
+        } catch {
+          // Ignore blurry/loading frames and keep scanning.
+        }
+      }
+
+      nativeFrameRef.current = window.requestAnimationFrame(detectLoop);
+    };
+
+    nativeFrameRef.current = window.requestAnimationFrame(detectLoop);
+    return true;
+  }, [configureCameraTrack, handleDecodedText]);
+
   useEffect(() => {
     let isMounted = true;
     let html5QrCode: Html5Qrcode | null = null;
@@ -143,11 +239,13 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
     if (isScanning) {
       setError('');
       setShowZoom(false);
+      setScannerEngine(null);
       setZoom(2);
 
-      const startFallbackScanner = () => {
+      const startHtml5Scanner = () => {
         if (!isMounted) return;
 
+        setScannerEngine('html5');
         html5QrCode = new Html5Qrcode(readerId, {
           verbose: false,
         });
@@ -176,11 +274,24 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
         });
       };
 
-      startFallbackScanner();
+      if (isLikelyPhoneOrTablet()) {
+        startHtml5Scanner();
+      } else {
+        startNativeScanner()
+          .then(started => {
+            if (!started) startHtml5Scanner();
+          })
+          .catch(err => {
+            console.warn("Native barcode scanner unavailable, using html5-qrcode.", err);
+            stopNativeScanner();
+            startHtml5Scanner();
+          });
+      }
     }
 
     return () => {
       isMounted = false;
+      stopNativeScanner();
       if (html5QrCode && startPromise) {
         // Wait for start to finish before stopping to prevent transition errors
         startPromise.then(() => {
@@ -196,7 +307,7 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
         });
       }
     };
-  }, [configureCameraTrack, handleDecodedText, isScanning, readerId, setIsScanning]);
+  }, [configureCameraTrack, handleDecodedText, isScanning, readerId, setIsScanning, startNativeScanner, stopNativeScanner]);
 
   return (
     <div className="flex items-center gap-2 relative">
@@ -233,7 +344,18 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
             </button>
           </div>
           <div className="flex justify-center overflow-hidden bg-black p-4">
-            <div id={readerId} className="w-full max-w-[300px] min-h-[300px] overflow-hidden rounded-xl bg-black"></div>
+            <div className="relative w-full max-w-[340px] min-h-[300px] overflow-hidden rounded-xl bg-black">
+              <video
+                ref={videoRef}
+                muted
+                playsInline
+                className={`absolute inset-0 h-full w-full object-cover ${scannerEngine === 'native' ? 'block' : 'hidden'}`}
+              />
+              <div
+                id={readerId}
+                className={`w-full max-w-[300px] min-h-[300px] ${scannerEngine === 'native' ? 'hidden' : ''}`}
+              />
+            </div>
           </div>
           
           {showZoom && (
@@ -253,7 +375,9 @@ export function CameraScanner({ onScan, isScanning, setIsScanning, buttonClassNa
           )}
 
           <div className="p-4 text-center text-sm text-stone-500 bg-stone-50">
-            Align the barcode horizontally within the box. Good lighting helps with curved bottles!
+            {scannerEngine === 'native'
+              ? 'Fast scanner is active on this device. Align the UPC horizontally in the camera view.'
+              : 'Phone-compatible scanner is active. Good lighting helps with curved bottles!'}
           </div>
         </div>
       </div>
