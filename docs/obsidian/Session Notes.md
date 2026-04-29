@@ -10,6 +10,13 @@ status: active
 
 Add short notes after meaningful work. Newest entries go first.
 
+## 2026-04-29: Alabama order import bottle cost
+
+- Orders UI now shows imported-line **Cost / Bottle** from the pre-discount order price; case lines divide price by pack size, bottle lines use price directly, and unknown pack sizes show `N/A`.
+- Imported order lines render a UPC barcode for valid numeric UPCs, matching the product listing barcode style.
+- Fixed Alabama money parsing for cells that include both visible and screen-reader prices, avoiding stored values like `69.9969` that displayed as `$70.00`.
+- Receive controls now use mobile-friendly minus/value/plus steppers for received bottles and rack count.
+
 ## 2026-04-26: Camera scanner reliability
 
 - Made scanner output and product UPC lookup tolerate the common scanner case where UPC-A is reported with one extra leading zero.

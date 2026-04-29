@@ -44,7 +44,8 @@ function escapeRegExp(value: string) {
 }
 
 function parseMoney(value: string) {
-  const normalized = value.replace(/[$,\s]/g, '');
+  const match = value.match(/\$?\s*[\d,]+(?:\.\d{1,2})?/);
+  const normalized = (match?.[0] || value).replace(/[$,\s]/g, '');
   const parsed = Number.parseFloat(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
 }

@@ -161,4 +161,43 @@ describe('parseAlabamaOrderHtml', () => {
     expect(parsed.shipping_method).toBe('Pick Up in store');
     expect(parsed.location_code).toBe('Store 236');
   });
+
+  it('parses the first money amount when cells include visible and screen-reader prices', () => {
+    const parsed = parseAlabamaOrderHtml(`
+      <dl class="Order_general-info">
+        <dt>Document no.</dt><dd>DOC-1004</dd>
+        <dt>Order no.</dt><dd>ORD-2004</dd>
+      </dl>
+      <table>
+        <thead>
+          <tr>
+            <th>UPC</th><th>Item No.</th><th>Title</th><th>Shipment date</th><th>Price</th><th>Discount</th><th>Qty</th><th>Pack Size</th><th>UOM</th><th>Qty Outstanding</th><th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="Order_product-line">
+            <td>812459012004</td>
+            <td class="Order_line-id">A007821</td>
+            <td class="Order_line-title">Calumet Bourbon</td>
+            <td class="Order_line-shipment-date">04/15/2026</td>
+            <td class="Order_line-price"><span aria-hidden="true">$69.99</span><i class="visually-hidden">$69.99</i></td>
+            <td class="Order_line-discount"></td>
+            <td class="Order_line-qty">2</td>
+            <td>6</td>
+            <td class="Order_line-uom">Bottles</td>
+            <td class="Order_line-qty-outstanding">0</td>
+            <td class="Order_line-total"><span aria-hidden="true">$139.98</span><i class="visually-hidden">$139.98</i></td>
+          </tr>
+        </tbody>
+      </table>
+      <table class="Order_totals-table">
+        <tr><td class="Order_totals-name">Subtotal</td><td class="Order_totals-value"><span class="visually-hidden">$139.98</span><span aria-hidden="true">$</span><span aria-hidden="true">139.98</span></td></tr>
+        <tr><td class="Order_totals-name">Total incl. tax</td><td class="Order_totals-value"><span class="visually-hidden">$139.98</span><span aria-hidden="true">$</span><span aria-hidden="true">139.98</span></td></tr>
+      </table>
+    `);
+
+    expect(parsed.lines[0].price).toBe(69.99);
+    expect(parsed.lines[0].line_total).toBe(139.98);
+    expect(parsed.total).toBe(139.98);
+  });
 });

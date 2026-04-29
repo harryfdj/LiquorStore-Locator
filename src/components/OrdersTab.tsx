@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle, ClipboardPaste, Lock, Search, Trash2, Truck } from 'lucide-react';
+import { AlertTriangle, CheckCircle, ClipboardPaste, Lock, Minus, Plus, Search, Trash2, Truck } from 'lucide-react';
+import Barcode from 'react-barcode';
 import { AdminConfirmModal } from './AdminConfirmModal';
 import { apiFetch, apiJson } from '../lib/api';
 import { Product, SupplierOrderDetail, SupplierOrderLine, SupplierOrderSummary } from '../types';
@@ -58,6 +59,40 @@ function isLineVerified(line: SupplierOrderLine) {
 /** Lines counted in the Issues summary (not pending, not cleanly matched). */
 function isIssueSummaryLine(line: SupplierOrderLine) {
   return !['pending', 'matched'].includes(line.issue_type);
+}
+
+function isRenderableUpc(value: string | null | undefined) {
+  return Boolean(value && /^\d{6,}$/.test(value.trim()));
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+}
+
+function costPerBottle(line: SupplierOrderLine) {
+  if (line.uom.toLowerCase().includes('case')) {
+    return line.pack_size ? line.price / line.pack_size : null;
+  }
+
+  return line.price;
+}
+
+function costPerBottleLabel(line: SupplierOrderLine) {
+  const cost = costPerBottle(line);
+  return cost === null ? 'N/A' : formatCurrency(cost);
+}
+
+function adjustQuantity(value: string, delta: number) {
+  const current = Number(value || 0);
+  const next = (Number.isFinite(current) ? Math.trunc(current) : 0) + delta;
+  return String(Math.max(0, next));
+}
+
+function sanitizeQuantityInput(value: string) {
+  if (value === '') return '';
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return '0';
+  return String(Math.max(0, Math.trunc(parsed)));
 }
 
 function matchesLineSearch(line: SupplierOrderLine, needle: string) {
@@ -569,10 +604,16 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
                         <span>Product <span className="font-mono text-slate-700">{line.product_sku || 'Not matched'}</span></span>
                       </div>
                     </div>
+                    {isRenderableUpc(line.upc) && (
+                      <div className="flex shrink-0 justify-center overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 p-2">
+                        <Barcode value={line.upc.trim()} format="CODE128" width={1.5} height={34} fontSize={12} background="transparent" />
+                      </div>
+                    )}
                   </div>
 
-                  <div className="mt-3 grid gap-2 sm:mt-4 sm:grid-cols-3 sm:gap-3">
+                  <div className="mt-3 grid gap-2 sm:mt-4 sm:grid-cols-4 sm:gap-3">
                     <Metric label="Ordered Bottles" value={line.ordered_bottles ?? 'Review'} />
+                    <Metric label="Cost / Bottle" value={costPerBottleLabel(line)} />
                     <Metric label="Current Rack Count" value={line.inventory_stock_snapshot ?? 'N/A'} />
                     <Metric label="Expected Rack After Delivery" value={line.ordered_bottles === null ? 'Review' : draftExpectedRack(line, drafts[line.id])} />
                   </div>
@@ -629,28 +670,18 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
                       </div>
 
                       <div className="grid gap-3 md:grid-cols-3">
-                        <label className="block">
-                          <span className="field-label">Received bottles</span>
-                          <input
-                            type="number"
-                            min="0"
-                            value={drafts[line.id]?.received || ''}
-                            onChange={event => setDrafts(prev => ({ ...prev, [line.id]: { ...prev[line.id], received: event.target.value } }))}
-                            disabled={orderLocked}
-                            className="control-input mt-1 w-full px-3 py-3 text-base disabled:cursor-not-allowed disabled:opacity-60"
-                          />
-                        </label>
-                        <label className="block">
-                          <span className="field-label">Rack count</span>
-                          <input
-                            type="number"
-                            min="0"
-                            value={drafts[line.id]?.rackCount || ''}
-                            onChange={event => setDrafts(prev => ({ ...prev, [line.id]: { ...prev[line.id], rackCount: event.target.value } }))}
-                            disabled={orderLocked}
-                            className="control-input mt-1 w-full px-3 py-3 text-base disabled:cursor-not-allowed disabled:opacity-60"
-                          />
-                        </label>
+                        <QuantityStepper
+                          label="Received bottles"
+                          value={drafts[line.id]?.received || ''}
+                          disabled={orderLocked}
+                          onChange={value => setDrafts(prev => ({ ...prev, [line.id]: { ...prev[line.id], received: value } }))}
+                        />
+                        <QuantityStepper
+                          label="Rack count"
+                          value={drafts[line.id]?.rackCount || ''}
+                          disabled={orderLocked}
+                          onChange={value => setDrafts(prev => ({ ...prev, [line.id]: { ...prev[line.id], rackCount: value } }))}
+                        />
                         <label className="block">
                           <span className="field-label">Note</span>
                           <input
@@ -748,5 +779,55 @@ function Metric({ label, value }: { label: string; value: string | number }) {
       <p className="text-xs text-slate-500">{label}</p>
       <p className="font-semibold text-slate-950">{value}</p>
     </div>
+  );
+}
+
+function QuantityStepper({
+  label,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  disabled: boolean;
+  onChange: (value: string) => void;
+}) {
+  const stepperButtonBase = 'flex min-h-12 items-center justify-center font-semibold shadow-sm transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60';
+
+  return (
+    <label className="block">
+      <span className="field-label">{label}</span>
+      <div className="mt-1 grid grid-cols-[56px_1fr_56px] overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-inner shadow-slate-200/40 focus-within:border-lime-300 focus-within:bg-white focus-within:ring-4 focus-within:ring-lime-200/50">
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => onChange(adjustQuantity(value, -1))}
+          className={`${stepperButtonBase} border-r border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-950`}
+          aria-label={`Decrease ${label}`}
+        >
+          <Minus className="h-5 w-5 stroke-[2.5]" aria-hidden />
+        </button>
+        <input
+          type="number"
+          min="0"
+          step="1"
+          inputMode="numeric"
+          value={value}
+          onChange={event => onChange(sanitizeQuantityInput(event.target.value))}
+          disabled={disabled}
+          className="min-w-0 border-0 bg-transparent px-3 py-3 text-center font-semibold text-slate-950 outline-none disabled:cursor-not-allowed disabled:opacity-60"
+        />
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => onChange(adjustQuantity(value, 1))}
+          className={`${stepperButtonBase} border-l border-lime-200 bg-lime-100 text-slate-950 hover:bg-lime-200`}
+          aria-label={`Increase ${label}`}
+        >
+          <Plus className="h-5 w-5 stroke-[2.5]" aria-hidden />
+        </button>
+      </div>
+    </label>
   );
 }
