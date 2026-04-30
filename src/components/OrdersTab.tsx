@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle, ClipboardPaste, Lock, Minus, Plus, Search, Trash2, Truck } from 'lucide-react';
+import { AlertTriangle, CheckCircle, ClipboardPaste, Lock, Minus, Plus, RefreshCcw, Search, Trash2, Truck } from 'lucide-react';
 import Barcode from 'react-barcode';
 import { AdminConfirmModal } from './AdminConfirmModal';
 import { apiFetch, apiJson } from '../lib/api';
@@ -82,6 +82,15 @@ function costPerBottleLabel(line: SupplierOrderLine) {
   return cost === null ? 'N/A' : formatCurrency(cost);
 }
 
+function displayUpc(line: SupplierOrderLine) {
+  return line.product_upc || line.upc || '';
+}
+
+function displayProduct(line: SupplierOrderLine) {
+  if (!line.product_sku) return 'Not matched';
+  return [line.product_sku, line.product_name].filter(Boolean).join(' · ');
+}
+
 function adjustQuantity(value: string, delta: number) {
   const current = Number(value || 0);
   const next = (Number.isFinite(current) ? Math.trunc(current) : 0) + delta;
@@ -121,6 +130,7 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
   const [drafts, setDrafts] = useState<Record<string, LineDraft>>({});
   const [productSearch, setProductSearch] = useState<Record<string, string>>({});
   const [productResults, setProductResults] = useState<Record<string, Product[]>>({});
+  const [rematchingLineIds, setRematchingLineIds] = useState<string[]>([]);
   const [isVerificationMode, setIsVerificationMode] = useState(false);
   const [lineFilter, setLineFilter] = useState<LineFilter>('all');
 
@@ -133,6 +143,7 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
     setDetail(nextDetail);
     setIsVerificationMode(false);
     setSearchQuery('');
+    setRematchingLineIds([]);
     setLineFilter('all');
   };
 
@@ -219,6 +230,7 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
       });
       setDetail(imported);
       setLineFilter('all');
+      setRematchingLineIds([]);
       setHtml('');
       await loadOrders();
       setMessage({ type: 'success', text: `Imported order ${imported.order.order_no} with ${imported.lines.length} lines.` });
@@ -243,6 +255,20 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
       body: JSON.stringify({ product_sku: sku }),
     });
     setDetail(nextDetail);
+    setRematchingLineIds(prev => prev.filter(id => id !== line.id));
+    setProductSearch(prev => ({ ...prev, [line.id]: '' }));
+    setProductResults(prev => ({ ...prev, [line.id]: [] }));
+    const updatedLine = nextDetail.lines.find(nextLine => nextLine.id === line.id);
+    if (updatedLine) {
+      setDrafts(prev => ({
+        ...prev,
+        [line.id]: {
+          received: String(updatedLine.ordered_bottles ?? 0),
+          rackCount: String(updatedLine.inventory_stock_snapshot ?? 0),
+          notes: updatedLine.notes || prev[line.id]?.notes || '',
+        },
+      }));
+    }
     await loadOrders();
   };
 
@@ -412,8 +438,8 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
         ) : (
           <div>
             <div className="border-b border-slate-200 bg-slate-50/80 p-3 sm:p-5">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div>
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Receiving Order</p>
                   <h3 className="mt-1 text-2xl font-semibold text-slate-950">{detail.order.order_no}</h3>
                   <p className="mt-1 text-sm text-slate-500">
@@ -426,7 +452,7 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
                     {detail.order.location_code || 'No location'}
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex shrink-0 flex-nowrap gap-2">
                   <button
                     type="button"
                     disabled={orderLocked}
@@ -434,11 +460,11 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
                       setIsVerificationMode(!isVerificationMode);
                       setSearchQuery('');
                     }}
-                    className={isVerificationMode ? 'btn-secondary px-5 py-2.5 text-sm' : 'btn-accent px-5 py-2.5 text-sm'}
+                    className={isVerificationMode ? 'btn-secondary whitespace-nowrap px-5 py-2.5 text-sm' : 'btn-accent whitespace-nowrap px-5 py-2.5 text-sm'}
                   >
                     {isVerificationMode ? 'Exit Verification Mode' : 'Verification Mode'}
                   </button>
-                  <button type="button" onClick={finalizeOrder} disabled={orderLocked || (summary?.pending || 0) > 0} className="btn-primary px-5 py-2.5 text-sm">
+                  <button type="button" onClick={finalizeOrder} disabled={orderLocked || (summary?.pending || 0) > 0} className="btn-primary whitespace-nowrap px-5 py-2.5 text-sm">
                     Finalize Report
                   </button>
                 </div>
@@ -588,7 +614,11 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
                             ? 'All lines are verified.'
                             : 'No order lines in this import.'}
                 </div>
-              ) : visibleLines.map(line => (
+              ) : visibleLines.map(line => {
+                const isProductSearchOpen = line.issue_type === 'manual_review' || rematchingLineIds.includes(line.id);
+                const currentUpc = displayUpc(line);
+
+                return (
                 <div id={`order-line-${line.id}`} key={line.id} className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-5">
                   <div className="flex flex-col gap-3 border-b border-slate-100 pb-3 sm:pb-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0">
@@ -599,32 +629,50 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
                       </div>
                       <h4 className="mt-2 text-lg font-semibold leading-snug text-slate-950 sm:mt-3 sm:text-xl">{line.title}</h4>
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
-                        <span>UPC <span className="font-mono text-slate-700">{line.upc || 'N/A'}</span></span>
+                        <span>UPC <span className="font-mono text-slate-700">{currentUpc || 'N/A'}</span></span>
                         <span>Item <span className="font-mono text-slate-700">{line.item_no || 'N/A'}</span></span>
-                        <span>Product <span className="font-mono text-slate-700">{line.product_sku || 'Not matched'}</span></span>
+                        <span>Product <span className="font-mono text-slate-700">{displayProduct(line)}</span></span>
                       </div>
                     </div>
-                    {isRenderableUpc(line.upc) && (
-                      <div className="flex shrink-0 justify-center overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 p-2">
-                        <Barcode value={line.upc.trim()} format="CODE128" width={1.5} height={34} fontSize={12} background="transparent" />
-                      </div>
-                    )}
+                    <div className="flex shrink-0 flex-col items-center gap-2 sm:flex-row">
+                      {line.product_sku && !orderLocked && (
+                        <button
+                          type="button"
+                          onClick={() => setRematchingLineIds(prev => prev.includes(line.id) ? prev : [...prev, line.id])}
+                          className="flex h-9 w-9 items-center justify-center rounded-full border border-lime-200 bg-lime-100 text-slate-950 shadow-sm transition-all hover:bg-lime-200 active:scale-[0.98]"
+                          aria-label={`Change product match for ${line.title}`}
+                          title="Change matched product"
+                        >
+                          <RefreshCcw className="h-4 w-4 stroke-[2.5]" aria-hidden />
+                        </button>
+                      )}
+                      {isRenderableUpc(currentUpc) && (
+                        <div className="flex justify-center overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 p-2">
+                          <Barcode value={currentUpc.trim()} format="CODE128" width={1.5} height={34} fontSize={12} background="transparent" />
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="mt-3 grid gap-2 sm:mt-4 sm:grid-cols-4 sm:gap-3">
-                    <Metric label="Ordered Bottles" value={line.ordered_bottles ?? 'Review'} />
-                    <Metric label="Cost / Bottle" value={costPerBottleLabel(line)} />
-                    <Metric label="Current Rack Count" value={line.inventory_stock_snapshot ?? 'N/A'} />
-                    <Metric label="Expected Rack After Delivery" value={line.ordered_bottles === null ? 'Review' : draftExpectedRack(line, drafts[line.id])} />
-                  </div>
+                  {line.product_sku && line.product_upc && line.product_upc !== line.upc && (
+                    <div className="mt-3 rounded-2xl border border-lime-200 bg-lime-50 px-4 py-3 text-xs font-medium text-lime-800">
+                      Showing selected product UPC <span className="font-mono text-lime-900">{line.product_upc}</span> instead of imported UPC <span className="font-mono text-lime-900">{line.upc || 'N/A'}</span>.
+                    </div>
+                  )}
 
-                  {line.issue_type === 'manual_review' && (
+                  {isProductSearchOpen && (
                     <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
                       <div className="flex items-start gap-3">
                         <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-600" />
                         <div className="flex-1">
-                          <p className="font-semibold text-amber-900">Manual product match required</p>
-                          <p className="text-sm text-amber-800">This line has UPC `N/A`, no product match, or missing pack-size data.</p>
+                          <p className="font-semibold text-amber-900">
+                            {line.product_sku ? 'Change matched product' : 'Manual product match required'}
+                          </p>
+                          <p className="text-sm text-amber-800">
+                            {line.product_sku
+                              ? 'Search again and select the correct inventory product for this imported line.'
+                              : 'This line has UPC `N/A`, no product match, or missing pack-size data.'}
+                          </p>
                           <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                             <input
                               value={productSearch[line.id] || ''}
@@ -636,6 +684,16 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
                             <button type="button" disabled={orderLocked} onClick={() => searchProducts(line.id)} className="btn-secondary px-4 py-2 text-sm">
                               Search
                             </button>
+                            {line.product_sku && (
+                              <button
+                                type="button"
+                                disabled={orderLocked}
+                                onClick={() => setRematchingLineIds(prev => prev.filter(id => id !== line.id))}
+                                className="btn-secondary px-4 py-2 text-sm"
+                              >
+                                Cancel
+                              </button>
+                            )}
                           </div>
                           {(productResults[line.id] || []).length > 0 && (
                             <div className="mt-3 grid gap-2">
@@ -648,7 +706,7 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
                                   className="rounded-2xl border border-slate-200 bg-white p-3 text-left text-sm hover:border-lime-300 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                   <span className="font-semibold text-slate-950">{product.name}</span>
-                                  <span className="ml-2 text-xs text-slate-500">SKU {product.sku} · Stock {product.stock} · Pack {product.pack || 'N/A'}</span>
+                                  <span className="ml-2 text-xs text-slate-500">SKU {product.sku} · UPC {product.mainupc || 'N/A'} · Stock {product.stock} · Pack {product.pack || 'N/A'}</span>
                                 </button>
                               ))}
                             </div>
@@ -657,6 +715,13 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
                       </div>
                     </div>
                   )}
+
+                  <div className="mt-3 grid gap-2 sm:mt-4 sm:grid-cols-4 sm:gap-3">
+                    <Metric label="Ordered Bottles" value={line.ordered_bottles ?? 'Review'} />
+                    <Metric label="Cost / Bottle" value={costPerBottleLabel(line)} />
+                    <Metric label="Current Rack Count" value={line.inventory_stock_snapshot ?? 'N/A'} />
+                    <Metric label="Expected Rack After Delivery" value={line.ordered_bottles === null ? 'Review' : draftExpectedRack(line, drafts[line.id])} />
+                  </div>
 
                   {line.product_sku && line.ordered_bottles !== null && (
                     <div className="mt-4 rounded-3xl border border-slate-200 bg-slate-50 p-3 sm:mt-5 sm:p-4">
@@ -711,7 +776,8 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
                     </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

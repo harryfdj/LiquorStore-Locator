@@ -16,6 +16,7 @@ Add short notes after meaningful work. Newest entries go first.
 - Imported order lines render a UPC barcode for valid numeric UPCs, matching the product listing barcode style.
 - Fixed Alabama money parsing for cells that include both visible and screen-reader prices, avoiding stored values like `69.9969` that displayed as `$70.00`.
 - Receive controls now use mobile-friendly minus/value/plus steppers for received bottles and rack count.
+- Matched order lines can be reopened for product search if the wrong inventory product was selected; the line display now prefers the selected product UPC.
 
 ## 2026-04-26: Camera scanner reliability
 

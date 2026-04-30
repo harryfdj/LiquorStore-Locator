@@ -346,8 +346,11 @@ router.put('/:id/lines/:lineId/match-product', async (req, res) => {
         inventory_pack_snapshot: product.pack,
         pack_size: packSize,
         ordered_bottles: orderedBottles,
+        received_bottles: null,
+        final_rack_count: null,
         status: needsReview ? 'manual_review' : 'pending',
         issue_type: needsReview ? 'manual_review' : 'pending',
+        verified_at: null,
       })
       .eq('store_id', storeId)
       .eq('order_id', req.params.id)
