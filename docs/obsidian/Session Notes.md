@@ -10,6 +10,20 @@ status: active
 
 Add short notes after meaningful work. Newest entries go first.
 
+## 2026-04-29: Experimental image fetch accuracy branch
+
+- Created `harryfdj/feat/test-image-fetch-confidence` for testing improved product image autofetch without changing `main`.
+- Experimental image fetch skips products with `stock <= 0`, avoids UPC-first search, uses name/size/product-type queries, prefers trusted product source domains, and only auto-saves high-confidence matches.
+- Manual image candidates now use the same improved query/scoring order while still returning URL candidates for selection.
+
+## 2026-04-29: GCP blank page recovery
+
+- Diagnosed the live `https://34.72.8.208.nip.io` blank page as a zero-byte `dist/index.html` on the Compute Engine VM.
+- Root cause was the VM root disk reaching 100% usage; build output was truncated while PM2 and Caddy still returned HTTP 200.
+- Freed safe cache/log space, rebuilt `dist`, restarted PM2, and verified the homepage plus JS/CSS assets return non-zero content.
+- Remaining risk: local `public/product-images-*` folders consume about 3.8GB on the 10GB VM disk, so future deploys can fail again unless images are migrated/deleted or the disk is expanded.
+- Deleted old VM-local `public/product-images-*` folders after confirming images will be downloaded again; root disk usage dropped from 93% to 51%.
+
 ## 2026-04-29: Alabama order import bottle cost
 
 - Orders UI now shows imported-line **Cost / Bottle** from the pre-discount order price; case lines divide price by pack size, bottle lines use price directly, and unknown pack sizes show `N/A`.

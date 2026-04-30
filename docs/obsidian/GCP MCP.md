@@ -68,7 +68,9 @@ Use least-privilege IAM for production work. Do not store service-account keys, 
 - Runtime env: `NODE_ENV=production`.
 - Git remote on VM: `https://github.com/harryfdj/LiquorStore-Locator.git`.
 - VM branch: `main`.
-- Last verified commit on VM: `5b8d47f`.
+- Last verified commit on VM: `0e11134`.
+- Last recovery note: 2026-04-29 blank page was caused by a zero-byte `dist/index.html` after the VM disk filled. Safe cache/log cleanup plus `npm run build` and PM2 restart restored the site.
+- Disk note: old VM-local `public/product-images-*` folders were deleted after the 2026-04-29 recovery, reducing root disk usage to about 51%.
 
 ## Cloud Build Deployment
 

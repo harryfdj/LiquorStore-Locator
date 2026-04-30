@@ -5,6 +5,173 @@ import http from 'http';
 import { config } from '../lib/config';
 import { supabaseAdmin } from '../lib/supabase';
 
+type ImageSearchProduct = {
+  name: string;
+  size?: string | null;
+  depname?: string | null;
+  category?: string | null;
+};
+
+type ImageSearchResult = {
+  url: string;
+  title: string;
+  domain: string;
+};
+
+export const trustedImageDomains = [
+  'totalwine',
+  'reservebar',
+  'drizly',
+  'wine.com',
+  'minibar',
+  'instacart',
+  'kroger',
+  'walmart',
+  'target',
+  'bevmo',
+  'binny',
+  'empirewine',
+  'applejack',
+  'saratogawine',
+  'specsonline',
+  'abc.virginia.gov',
+  'lcbo',
+  'thewhiskyexchange',
+  'masterofmalt',
+];
+
+export const blockedImageDomains = [
+  'pinterest',
+  'etsy',
+  'aliexpress',
+  'shutterstock',
+  'istockphoto',
+  'dreamstime',
+  '123rf',
+  'depositphotos',
+  'vector',
+  'illustration',
+  'clipart',
+  'alamy',
+  'ebay',
+];
+
+const imageNoiseWords = new Set([
+  'the',
+  'and',
+  'for',
+  'with',
+  'bottle',
+  'single',
+  'pack',
+  'each',
+  'case',
+  'ml',
+  'lt',
+  'liter',
+  'litre',
+  'oz',
+  'size',
+]);
+
+function compactSpaces(value: string) {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+function normalizeSearchText(value: string) {
+  return compactSpaces(value.toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9. ]/g, ' '));
+}
+
+function productWords(productName: string) {
+  return normalizeSearchText(productName)
+    .split(/\s+/)
+    .filter(word => word.length >= 2 && !imageNoiseWords.has(word));
+}
+
+function normalizeSize(size?: string | null) {
+  if (!size) return '';
+  const normalized = normalizeSearchText(size)
+    .replace(/\b(ltr|liters|liter|litre|l)\b/g, 'l')
+    .replace(/\bmilliliters|milliliter\b/g, 'ml');
+  const match = normalized.match(/\b\d+(?:\.\d+)?\s*(?:ml|l|oz)\b/);
+  return match ? match[0].replace(/\s+/g, '') : normalized;
+}
+
+function productType(product: ImageSearchProduct) {
+  const text = normalizeSearchText(`${product.depname || ''} ${product.category || ''} ${product.name}`);
+  if (text.includes('wine') || text.includes('champagne') || text.includes('prosecco')) return 'wine';
+  if (text.includes('beer') || text.includes('ale') || text.includes('lager') || text.includes('seltzer')) return 'beer';
+  if (text.includes('vodka')) return 'vodka';
+  if (text.includes('whiskey') || text.includes('whisky') || text.includes('bourbon') || text.includes('scotch')) return 'whiskey';
+  if (text.includes('tequila') || text.includes('mezcal')) return 'tequila';
+  if (text.includes('rum')) return 'rum';
+  if (text.includes('gin')) return 'gin';
+  if (text.includes('liqueur') || text.includes('cordial')) return 'liqueur';
+  return 'liquor';
+}
+
+function includesAnyDomain(value: string, domains: string[]) {
+  const lower = value.toLowerCase();
+  return domains.some(domain => lower.includes(domain));
+}
+
+export function buildImageSearchQueries(product: ImageSearchProduct) {
+  const name = compactSpaces(product.name);
+  const size = normalizeSize(product.size);
+  const kind = productType(product);
+  const nameWithSize = compactSpaces(`${name} ${size}`);
+  const trustedSites = ['totalwine.com', 'reservebar.com', 'wine.com', 'instacart.com'];
+
+  const queries = [
+    ...trustedSites.map(site => `site:${site} ${nameWithSize} ${kind} bottle`),
+    `${nameWithSize} ${kind} bottle`,
+    `${nameWithSize} bottle`,
+    `${name} ${kind} bottle`,
+    `${name} product bottle`,
+  ];
+
+  return Array.from(new Set(queries.map(compactSpaces).filter(Boolean)));
+}
+
+export function isBlockedImageResult(result: ImageSearchResult) {
+  return includesAnyDomain(`${result.url} ${result.domain}`, blockedImageDomains);
+}
+
+export function scoreProductImageMatch(product: ImageSearchProduct, result: ImageSearchResult) {
+  const titleLower = normalizeSearchText(result.title);
+  const urlLower = normalizeSearchText(result.url);
+  const domainLower = result.domain.toLowerCase();
+  const haystack = `${titleLower} ${urlLower} ${domainLower}`;
+  const words = productWords(product.name);
+  const size = normalizeSize(product.size);
+  const kind = productType(product);
+
+  if (words.length === 0 || isBlockedImageResult(result)) return 0;
+
+  let score = 0;
+  const matchedWords = words.filter(word => haystack.includes(word));
+
+  score += matchedWords.length * 4;
+  score += Math.round((matchedWords.length / words.length) * 10);
+
+  if (titleLower.includes(normalizeSearchText(product.name))) score += 8;
+  if (size && haystack.replace(/\s+/g, '').includes(size)) score += 6;
+  if (haystack.includes(kind)) score += 3;
+  if (haystack.includes('bottle')) score += 2;
+  if (includesAnyDomain(`${result.url} ${result.domain}`, trustedImageDomains)) score += 10;
+
+  const unrelatedHints = ['shirt', 'poster', 'sign', 'sticker', 'empty bottle', 'glassware', 'recipe'];
+  if (unrelatedHints.some(hint => haystack.includes(hint))) score -= 8;
+
+  return Math.max(0, score);
+}
+
+export function imageMatchConfidence(score: number): 'high' | 'medium' | 'low' {
+  if (score >= 28) return 'high';
+  if (score >= 18) return 'medium';
+  return 'low';
+}
+
 // Fetch a URL and return the HTML body
 export const fetchPage = (url: string): Promise<string> => {
   const lib = url.startsWith('https') ? https : http;
@@ -27,7 +194,7 @@ export const fetchPage = (url: string): Promise<string> => {
 };
 
 // Search Bing Images
-export const searchImages = async (query: string): Promise<{ url: string; title: string; domain: string }[]> => {
+export const searchImages = async (query: string): Promise<ImageSearchResult[]> => {
   const searchUrl = `https://www.bing.com/images/search?q=${encodeURIComponent(query)}&form=HDRSC2&first=1`;
   const html = await fetchPage(searchUrl);
 
@@ -48,15 +215,9 @@ export const searchImages = async (query: string): Promise<{ url: string; title:
 
 // Score how well a Bing result matches the product name (like a human scanning image results).
 export const scoreImageMatch = (productName: string, result: { title: string; domain: string; url: string }): number => {
-  const nameLower = productName.toLowerCase();
   const titleLower = result.title.toLowerCase();
   const urlLower = result.url.toLowerCase();
-
-  const noise = new Set(['the', 'and', 'for', 'with', 'bottle', 'single', 'pack', 'each', 'case', 'ml', 'lt', 'oz']);
-  const nameWords = nameLower
-    .replace(/[^a-z0-9 ]/g, ' ')
-    .split(/\s+/)
-    .filter(w => w.length >= 2 && !noise.has(w));
+  const nameWords = productWords(productName);
 
   if (nameWords.length === 0) return 0;
 

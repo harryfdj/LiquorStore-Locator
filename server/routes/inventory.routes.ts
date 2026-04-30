@@ -7,7 +7,14 @@ import { requireAuth } from '../middlewares/auth';
 import { requireStoreId, sendError } from '../lib/http';
 import { mapProduct, parseAltUpcs, ProductRow, supabaseAdmin } from '../lib/supabase';
 import { updateProductSchema } from '../lib/schemas';
-import { downloadImageToStorage, searchImages, scoreImageMatch } from '../services/scraper';
+import {
+  buildImageSearchQueries,
+  downloadImageToStorage,
+  imageMatchConfidence,
+  isBlockedImageResult,
+  scoreProductImageMatch,
+  searchImages,
+} from '../services/scraper';
 
 const router = express.Router();
 router.use(requireAuth);
@@ -211,35 +218,42 @@ router.post('/:sku/fetch-image', async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    const badDomains = ['pinterest', 'etsy', 'aliexpress', 'shutterstock', 'istockphoto', 'dreamstime', '123rf', 'depositphotos', 'vector', 'illustration', 'clipart', 'alamy'];
+    if ((product.stock || 0) <= 0) {
+      return res.json({ success: false, skipped: true, reason: 'out_of_stock' });
+    }
 
-    const sizeStr = product.size ? ` ${product.size}` : '';
-    const queries = [
-      `${product.name}${sizeStr} bottle`.trim(),
-      `${product.name} bottle liquor`.trim(),
-      `${product.name}`.trim(),
-    ];
+    const queries = buildImageSearchQueries(product);
 
     let bestImage: string | null = null;
+    let bestScore = 0;
+    let bestConfidence: 'high' | 'medium' | 'low' = 'low';
+    const seenUrls = new Set<string>();
 
     for (const query of queries) {
       try {
         const results = await searchImages(query);
         if (results && results.length > 0) {
-          let valid = results.filter((img: any) => {
-            const lowerUrl = img.url.toLowerCase();
-            return !badDomains.some(domain => lowerUrl.includes(domain));
+          const valid = results.filter(img => {
+            if (seenUrls.has(img.url) || isBlockedImageResult(img)) return false;
+            seenUrls.add(img.url);
+            return true;
           });
-          if (valid.length === 0) valid = results;
 
-          const scored = valid.map((img: any) => ({
+          const scored = valid.map(img => ({
             ...img,
-            score: scoreImageMatch(product.name, img),
+            score: scoreProductImageMatch(product, img),
           }));
 
-          scored.sort((a: any, b: any) => b.score - a.score);
-          bestImage = scored[0].url;
-          break;
+          scored.sort((a, b) => b.score - a.score);
+          const candidate = scored[0];
+
+          if (candidate && candidate.score > bestScore) {
+            bestImage = candidate.url;
+            bestScore = candidate.score;
+            bestConfidence = imageMatchConfidence(candidate.score);
+          }
+
+          if (bestConfidence === 'high') break;
         }
       } catch (e: any) {
         console.log(`Search failed for query "${query}": ${e.message}`);
@@ -247,7 +261,7 @@ router.post('/:sku/fetch-image', async (req, res) => {
       await new Promise(r => setTimeout(r, 300));
     }
 
-    if (bestImage) {
+    if (bestImage && bestConfidence === 'high') {
       let finalImageUrl = bestImage;
       try {
         finalImageUrl = await downloadImageToStorage(bestImage, sku, storeId);
@@ -262,9 +276,16 @@ router.post('/:sku/fetch-image', async (req, res) => {
         .eq('sku', sku);
 
       if (updateError) throw updateError;
-      return res.json({ success: true, image_url: finalImageUrl });
+      return res.json({ success: true, image_url: finalImageUrl, confidence: bestConfidence, score: bestScore });
     } else {
-      return res.json({ success: false, no_image: true });
+      return res.json({
+        success: false,
+        no_image: true,
+        needs_review: !!bestImage,
+        candidate_url: bestImage,
+        confidence: bestConfidence,
+        score: bestScore,
+      });
     }
   } catch (error) {
     return sendError(res, error, 'Failed to fetch image');
@@ -278,7 +299,7 @@ router.get('/:sku/image-candidates', async (req, res) => {
     const storeId = requireStoreId(req);
     const { data: product, error } = await supabaseAdmin
       .from('products')
-      .select('name')
+      .select('name,size,depname,category')
       .eq('store_id', storeId)
       .eq('sku', sku)
       .single();
@@ -287,27 +308,39 @@ router.get('/:sku/image-candidates', async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    const query = `${product.name} bottle`.trim();
     let allImages: any[] = [];
-    try {
-      const results = await searchImages(query);
-      if (results && results.length > 0) {
-        allImages = results;
+    const queries = buildImageSearchQueries(product);
+
+    for (const query of queries) {
+      try {
+        const results = await searchImages(query);
+        if (results && results.length > 0) {
+          allImages.push(...results);
+        }
+      } catch (e: any) {
+        console.log(`Search failed for query "${query}": ${e.message}`);
       }
-    } catch (e: any) {
-      console.log(`Search failed for query "${query}": ${e.message}`);
+      if (allImages.length >= 20) break;
     }
 
     if (allImages && allImages.length > 0) {
       const uniqueUrls = new Set();
-      const candidates = [];
-      for (const img of allImages) {
+      const candidates = allImages
+        .filter(img => !isBlockedImageResult(img))
+        .map(img => ({
+          ...img,
+          score: scoreProductImageMatch(product, img),
+        }))
+        .sort((a, b) => b.score - a.score);
+
+      const urls = [];
+      for (const img of candidates) {
         if (!uniqueUrls.has(img.url)) {
           uniqueUrls.add(img.url);
-          candidates.push(img.url);
+          urls.push(img.url);
         }
       }
-      return res.json({ success: true, candidates });
+      return res.json({ success: true, candidates: urls });
     } else {
       return res.json({ success: true, candidates: [] });
     }

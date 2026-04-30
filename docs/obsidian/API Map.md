@@ -50,6 +50,7 @@ status: draft
 - `GET /api/products/upc/:upc` tries exact UPC/SKU variants before partial matches, including scanner-added leading-zero variants and no-check-digit variants.
 - CSV upload is handled by the inventory router.
 - Image search and image update flow uses the scraper service and Supabase Storage.
+- Experimental image fetching on branch `harryfdj/feat/test-image-fetch-confidence` skips zero-stock products, uses name/size/type queries instead of UPC search, prefers trusted product source domains, and only auto-saves high-confidence matches.
 
 ## Verification Flow
 

@@ -99,9 +99,15 @@ export function useInventory(searchQuery: string) {
   };
 
   const batchFetchImages = async () => {
-    const productsWithoutImages = products.filter(p => !p.image_url);
+    const productsWithoutImages = products.filter(p => !p.image_url && p.stock > 0);
+    const skippedOutOfStock = products.filter(p => !p.image_url && p.stock <= 0).length;
     if (productsWithoutImages.length === 0) {
-      setUploadMessage({ type: 'success', text: 'All products already have images!' });
+      setUploadMessage({
+        type: 'success',
+        text: skippedOutOfStock > 0
+          ? `No in-stock products need images. Skipped ${skippedOutOfStock} out-of-stock items.`
+          : 'All products already have images!',
+      });
       return;
     }
 
@@ -159,7 +165,7 @@ export function useInventory(searchQuery: string) {
     } else {
       setUploadMessage({
         type: 'success',
-        text: `Done! Found images for ${successCount} out of ${productsWithoutImages.length} products.`,
+        text: `Done! Found images for ${successCount} out of ${productsWithoutImages.length} in-stock products.${skippedOutOfStock ? ` Skipped ${skippedOutOfStock} out-of-stock items.` : ''}`,
       });
     }
   };
