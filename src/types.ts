@@ -109,10 +109,12 @@ export interface SupplierOrderLine {
   product_sku: string | null;
   product_name: string | null;
   product_upc: string | null;
+  product_location: string | null;
   inventory_stock_snapshot: number | null;
   inventory_pack_snapshot: string | null;
   received_bottles: number | null;
   final_rack_count: number | null;
+  is_auto_matched: boolean;
   status: 'pending' | 'matched' | 'mismatched' | 'manual_review';
   issue_type: 'pending' | 'matched' | 'short_received' | 'extra_received' | 'rack_mismatch' | 'manual_review';
   notes: string;

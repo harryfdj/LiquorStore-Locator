@@ -626,6 +626,12 @@ export function OrdersTab({ searchQuery, setSearchQuery }: OrdersTabProps) {
                         <span className={`status-chip ${statusClass(line)}`}>{statusLabel(line)}</span>
                         <span className="status-chip border-slate-200 bg-slate-50 text-slate-600">{line.uom}</span>
                         {line.pack_size && <span className="status-chip border-slate-200 bg-slate-50 text-slate-600">Pack {line.pack_size}</span>}
+                        {line.product_location && <span className="status-chip border-slate-200 bg-slate-50 text-slate-600 font-medium">Loc: {line.product_location}</span>}
+                        <span 
+                          title={line.is_auto_matched ? "Auto-matched during import" : "Required manual matching"} 
+                          className={`h-2.5 w-2.5 shrink-0 rounded-full ${line.is_auto_matched ? 'bg-green-500' : 'bg-orange-500'}`} 
+                          aria-hidden="true" 
+                        />
                       </div>
                       <h4 className="mt-2 text-lg font-semibold leading-snug text-slate-950 sm:mt-3 sm:text-xl">{line.title}</h4>
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">

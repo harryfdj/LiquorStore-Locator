@@ -225,8 +225,10 @@ router.post('/import-html', async (req, res) => {
         product_sku: product?.sku || null,
         product_name: product?.name || null,
         product_upc: product?.mainupc || null,
+        product_location: product?.location || null,
         inventory_stock_snapshot: product?.stock ?? null,
         inventory_pack_snapshot: product?.pack || null,
+        is_auto_matched: !needsReview,
         status: needsReview ? 'manual_review' : 'pending',
         issue_type: needsReview ? 'manual_review' : 'pending',
       });
@@ -342,6 +344,7 @@ router.put('/:id/lines/:lineId/match-product', async (req, res) => {
         product_sku: product.sku,
         product_name: product.name,
         product_upc: product.mainupc,
+        product_location: product.location,
         inventory_stock_snapshot: product.stock,
         inventory_pack_snapshot: product.pack,
         pack_size: packSize,
