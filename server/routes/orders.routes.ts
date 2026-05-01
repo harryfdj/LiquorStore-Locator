@@ -165,9 +165,29 @@ async function loadOrder(storeId: string, orderId: string) {
     .order('line_index', { ascending: true });
   if (linesError) throw linesError;
 
+  const orderLines = (lines || []) as SupplierOrderLineRow[];
+  const skus = Array.from(new Set(orderLines.map(l => l.product_sku).filter(Boolean))) as string[];
+
+  if (skus.length > 0) {
+    const { data: products, error: productsError } = await supabaseAdmin
+      .from('products')
+      .select('sku, location')
+      .eq('store_id', storeId)
+      .in('sku', skus);
+      
+    if (!productsError && products) {
+      const locationMap = new Map(products.map(p => [p.sku, p.location]));
+      for (const line of orderLines) {
+        if (line.product_sku && locationMap.has(line.product_sku)) {
+          line.product_location = locationMap.get(line.product_sku) || null;
+        }
+      }
+    }
+  }
+
   return {
-    order: mapOrder(order as SupplierOrderRow, (lines || []) as SupplierOrderLineRow[]),
-    lines: (lines || []) as SupplierOrderLineRow[],
+    order: mapOrder(order as SupplierOrderRow, orderLines),
+    lines: orderLines,
   };
 }
 
